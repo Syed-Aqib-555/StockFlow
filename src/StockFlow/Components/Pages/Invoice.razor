@@ -1,0 +1,23 @@
+@page "/orders/{Id:int}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IJSRuntime JS
+
+<PageTitle>Invoice · StockFlow</PageTitle>
+<div class="page-heading no-print"><div><p class="eyebrow">ORDER RECORD</p><h1>Invoice</h1><p>A printable record with historical cost and price captured at sale time.</p></div><div class="page-actions"><a class="btn btn-outline" href="orders">← Orders</a><button class="btn btn-accent" @onclick="PrintAsync">Print invoice</button></div></div>
+@if(sale is null){<div class="loading-card">Loading invoice…</div>}else{
+<article class="invoice">
+    <div class="invoice-head"><div><div class="invoice-brand">StockFlow<span class="text-success">.</span></div><p class="muted mt-2">SAH Store · Single-location inventory & retail</p></div><div class="invoice-meta"><h2>INVOICE</h2><strong>@sale.SaleNumber</strong><p class="muted mt-2">@sale.Date.ToLocalTime().ToString("dd MMMM yyyy · HH:mm")</p><span class="status @(sale.Status==SaleStatus.Completed?"success":"danger")">@sale.Status</span></div></div>
+    <div class="invoice-parties"><div><h3>Billed to</h3><strong>@(sale.Customer?.Name??"Walk-in customer")</strong><p class="muted mt-2">@sale.Customer?.Phone<br/>@sale.Customer?.Email</p></div><div><h3>Payment</h3><strong>@sale.PaymentMethod</strong><p class="muted mt-2">Paid in full at checkout</p></div></div>
+    <div class="table-wrap"><table class="sf-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead><tbody>@foreach(var item in sale.Items){<tr><td><strong>@item.Variant.Product.Name</strong><div class="muted">@item.Variant.Size · @item.Variant.Color</div></td><td><span class="sku">@item.Variant.Sku</span></td><td>@item.Quantity</td><td>$@item.UnitPrice.ToString("N2")</td><td class="money">$@item.LineTotal.ToString("N2")</td></tr>}</tbody></table></div>
+    <div class="invoice-total"><div class="total-row"><span>Subtotal</span><strong>$@sale.Subtotal.ToString("N2")</strong></div><div class="total-row"><span>Discount</span><span>− $@sale.Discount.ToString("N2")</span></div><div class="total-row grand"><span>Total paid</span><strong>$@sale.Total.ToString("N2")</strong></div></div>
+    @if(sale.Status==SaleStatus.Cancelled){<div class="alert alert-danger mt-4"><strong>Voided:</strong> @sale.CancellationReason</div>}
+    <p class="muted text-center mt-5 mb-0">Thank you for shopping with SAH Store.</p>
+</article>}
+
+@code{
+    [Parameter]public int Id{get;set;}private Sale? sale;
+    protected override async Task OnParametersSetAsync(){await using var db=await DbFactory.CreateDbContextAsync();sale=await db.Sales.AsNoTracking().Include(x=>x.Customer).Include(x=>x.Items).ThenInclude(x=>x.Variant).ThenInclude(x=>x.Product).SingleOrDefaultAsync(x=>x.Id==Id);}
+    private async Task PrintAsync()=>await JS.InvokeVoidAsync("print");
+}
