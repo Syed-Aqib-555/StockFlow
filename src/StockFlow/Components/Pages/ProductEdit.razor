@@ -1,0 +1,128 @@
+@page "/products/new"
+@page "/products/{Id:int}/edit"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@using System.ComponentModel.DataAnnotations
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+
+<PageTitle>@(Id is null ? "Add product" : "Edit product") · StockFlow</PageTitle>
+
+<div class="page-heading">
+    <div><p class="eyebrow">PRODUCT CATALOG</p><h1>@(Id is null ? "Add a new product" : "Edit product")</h1><p>Create the product once, then add every size and color as a trackable variant.</p></div>
+    <a class="btn btn-outline" href="products">← Back to products</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(error)) { <div class="alert alert-danger">@error</div> }
+
+<EditForm Model="form" OnValidSubmit="SaveAsync">
+    <DataAnnotationsValidator />
+    <section class="form-card">
+        <h2>Product information</h2><p>The customer-facing details shared by all variants.</p>
+        <div class="form-grid">
+            <div><label class="form-label">Product name</label><InputText class="form-control" @bind-Value="form.Name" placeholder="e.g. No Limits No Fear T-Shirt" /><ValidationMessage For="@(() => form.Name)" /></div>
+            <div><label class="form-label">Category</label><InputSelect class="form-select" @bind-Value="form.CategoryId"><option value="0">Choose a category</option>@foreach (var category in categories){<option value="@category.Id">@category.Name</option>}</InputSelect></div>
+            <div><label class="form-label">Supplier</label><InputSelect class="form-select" @bind-Value="form.SupplierId"><option value="">No supplier</option>@foreach (var supplier in suppliers){<option value="@supplier.Id">@supplier.Name</option>}</InputSelect></div>
+            <div><label class="form-label">Image URL</label><InputText class="form-control" @bind-Value="form.ImageUrl" placeholder="https://…" /></div>
+            <div class="full"><label class="form-label">Description</label><InputTextArea class="form-control" @bind-Value="form.Description" rows="3" placeholder="Fabric, fit, and product details" /></div>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <div class="panel-title"><div><h2>Sizes, colors & pricing</h2><p>Every row has its own SKU, cost, selling price, and stock threshold.</p></div><button type="button" class="btn btn-outline btn-sm" @onclick="AddVariant">＋ Add variant</button></div>
+        <div class="variant-editor">
+            @foreach (var variant in form.Variants)
+            {
+                <div class="variant-row" @key="variant.Key">
+                    <label><span>Size</span><input class="form-control" @bind="variant.Size" /></label>
+                    <label><span>Color</span><input class="form-control" @bind="variant.Color" /></label>
+                    <label><span>SKU</span><input class="form-control" @bind="variant.Sku" /></label>
+                    <label><span>Cost ($)</span><input class="form-control" type="number" min="0" step="0.01" @bind="variant.CostPrice" /></label>
+                    <label><span>Price ($)</span><input class="form-control" type="number" min="0.01" step="0.01" @bind="variant.SellingPrice" /></label>
+                    <label><span>Low at</span><input class="form-control" type="number" min="0" @bind="variant.LowStockThreshold" /></label>
+                    <button type="button" class="btn btn-danger-soft btn-icon" title="Remove variant" @onclick="() => RemoveVariant(variant)">×</button>
+                </div>
+            }
+        </div>
+        <p class="form-text mt-3 mb-0">Opening quantities are received from the Inventory page so every unit has an audit record.</p>
+    </section>
+
+    <div class="page-actions"><button class="btn btn-accent" type="submit" disabled="@saving">@(saving ? "Saving…" : Id is null ? "Create product" : "Save changes")</button><a class="btn btn-outline" href="products">Cancel</a>@if (Id is not null){<button class="btn btn-danger-soft ms-auto" type="button" @onclick="ArchiveAsync">Archive product</button>}</div>
+</EditForm>
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    private ProductForm form = new();
+    private List<Category> categories = [];
+    private List<Supplier> suppliers = [];
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        categories = await db.Categories.AsNoTracking().OrderBy(x => x.Name).ToListAsync();
+        suppliers = await db.Suppliers.AsNoTracking().OrderBy(x => x.Name).ToListAsync();
+        if (Id is null)
+        {
+            form = new ProductForm { CategoryId = categories.FirstOrDefault()?.Id ?? 0, Variants = [new()] };
+            return;
+        }
+        var product = await db.Products.AsNoTracking().Include(x => x.Variants).SingleOrDefaultAsync(x => x.Id == Id);
+        if (product is null) { Navigation.NavigateTo("products"); return; }
+        form = new ProductForm { Name = product.Name, CategoryId = product.CategoryId, SupplierId = product.SupplierId, Description = product.Description, ImageUrl = product.ImageUrl,
+            Variants = product.Variants.Where(x => x.IsActive).Select(x => new VariantForm { Id = x.Id, Size = x.Size, Color = x.Color, Sku = x.Sku, CostPrice = x.CostPrice, SellingPrice = x.SellingPrice, LowStockThreshold = x.LowStockThreshold }).ToList() };
+    }
+
+    private void AddVariant() => form.Variants.Add(new VariantForm());
+    private void RemoveVariant(VariantForm variant) { if (form.Variants.Count > 1) form.Variants.Remove(variant); }
+
+    private async Task SaveAsync()
+    {
+        error = Validate();
+        if (error is not null) return;
+        saving = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var skus = form.Variants.Select(x => x.Sku.Trim()).ToArray();
+            if (await db.ProductVariants.AnyAsync(x => skus.Contains(x.Sku) && (Id == null || x.ProductId != Id))) { error = "Every SKU must be unique. One of these SKUs already exists."; return; }
+            Product product;
+            if (Id is null) { product = new Product(); db.Products.Add(product); }
+            else { product = await db.Products.Include(x => x.Variants).SingleAsync(x => x.Id == Id); }
+            product.Name = form.Name.Trim(); product.CategoryId = form.CategoryId; product.SupplierId = form.SupplierId; product.Description = form.Description?.Trim(); product.ImageUrl = form.ImageUrl?.Trim(); product.IsActive = true;
+            foreach (var existing in product.Variants.Where(x => form.Variants.All(v => v.Id != x.Id))) existing.IsActive = false;
+            foreach (var variantForm in form.Variants)
+            {
+                var variant = variantForm.Id is null ? new ProductVariant { Product = product } : product.Variants.Single(x => x.Id == variantForm.Id);
+                if (variantForm.Id is null) product.Variants.Add(variant);
+                variant.Size = variantForm.Size.Trim(); variant.Color = variantForm.Color.Trim(); variant.Sku = variantForm.Sku.Trim().ToUpperInvariant(); variant.CostPrice = variantForm.CostPrice; variant.SellingPrice = variantForm.SellingPrice; variant.LowStockThreshold = variantForm.LowStockThreshold; variant.IsActive = true;
+            }
+            await db.SaveChangesAsync();
+            Navigation.NavigateTo("products");
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+
+    private string? Validate()
+    {
+        if (form.CategoryId == 0) return "Choose a category.";
+        if (form.Variants.Count == 0) return "Add at least one product variant.";
+        if (form.Variants.Any(x => string.IsNullOrWhiteSpace(x.Size) || string.IsNullOrWhiteSpace(x.Color) || string.IsNullOrWhiteSpace(x.Sku))) return "Size, color, and SKU are required for every variant.";
+        if (form.Variants.Any(x => x.SellingPrice <= 0 || x.CostPrice < 0)) return "Enter valid cost and selling prices.";
+        if (form.Variants.Select(x => x.Sku.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != form.Variants.Count) return "SKUs must be unique within the product.";
+        return null;
+    }
+
+    private async Task ArchiveAsync()
+    {
+        if (Id is null) return;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var product = await db.Products.Include(x => x.Variants).SingleAsync(x => x.Id == Id);
+        product.IsActive = false; foreach (var variant in product.Variants) variant.IsActive = false; await db.SaveChangesAsync(); Navigation.NavigateTo("products");
+    }
+
+    private sealed class ProductForm { [Required, StringLength(140)] public string Name { get; set; } = ""; public int CategoryId { get; set; } public int? SupplierId { get; set; } public string? Description { get; set; } public string? ImageUrl { get; set; } public List<VariantForm> Variants { get; set; } = []; }
+    private sealed class VariantForm { public Guid Key { get; } = Guid.NewGuid(); public int? Id { get; set; } public string Size { get; set; } = ""; public string Color { get; set; } = ""; public string Sku { get; set; } = ""; public decimal CostPrice { get; set; } public decimal SellingPrice { get; set; } public int LowStockThreshold { get; set; } = 5; }
+}
