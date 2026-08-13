@@ -6,61 +6,100 @@
 
 <PageTitle>Dashboard · StockFlow</PageTitle>
 
-<div class="page-heading">
-    <div><p class="eyebrow">THURSDAY · LIVE OVERVIEW</p><h1>Good morning, <em>SAH Store.</em></h1><p>Here’s what’s happening with your store today.</p></div>
-    <a class="btn btn-accent" href="pos"><span>＋</span> New sale</a>
-</div>
+<section class="dashboard-hero">
+    <div>
+        <span class="eyebrow">SAH STORE · LIVE OPERATIONS</span>
+        <h1>@Greeting, <em>SAH Store.</em></h1>
+        <p>Your sales, inventory, and margins are up to date.</p>
+    </div>
+    <div class="hero-actions">
+        <span class="hero-date"><i></i>@DateTime.Now.ToString("dddd, dd MMMM")</span>
+        <a class="btn btn-accent" href="pos"><span aria-hidden="true">＋</span> Start new sale</a>
+    </div>
+</section>
 
 @if (snapshot is null)
 {
-    <div class="loading-card">Loading your store overview…</div>
+    <div class="loading-card">Preparing your live store overview…</div>
 }
 else
 {
-    <section class="metric-grid">
-        <article class="metric-card"><div class="metric-top"><span class="metric-icon green">↗</span><span class="trend up">↑ 12.4%</span></div><p>Today's sales</p><strong>$@snapshot.TodaySales.ToString("N0")</strong><small>Across @snapshot.OrdersToday orders</small></article>
-        <article class="metric-card"><div class="metric-top"><span class="metric-icon purple">◒</span><span class="trend up">↑ 8.1%</span></div><p>This month</p><strong>$@snapshot.MonthSales.ToString("N0")</strong><small>Revenue to date</small></article>
-        <article class="metric-card"><div class="metric-top"><span class="metric-icon gold">◇</span><span class="trend up">↑ 6.8%</span></div><p>Monthly profit</p><strong>$@snapshot.MonthProfit.ToString("N0")</strong><small>After cost and discounts</small></article>
-        <article class="metric-card"><div class="metric-top"><span class="metric-icon coral">!</span><span class="trend warn">Needs attention</span></div><p>Low stock</p><strong>@snapshot.LowStockCount <b>variants</b></strong><small>At or below threshold</small></article>
+    <section class="metric-grid" aria-label="Store performance summary">
+        <article class="metric-card">
+            <div class="metric-top"><span class="metric-icon green">TOD</span><span class="trend up">LIVE</span></div>
+            <p>Today's sales</p><strong>$@snapshot.TodaySales.ToString("N0")</strong><small>@snapshot.OrdersToday completed @(snapshot.OrdersToday == 1 ? "order" : "orders")</small>
+        </article>
+        <article class="metric-card" data-tone="purple">
+            <div class="metric-top"><span class="metric-icon purple">MTD</span><span class="trend neutral">MONTH TO DATE</span></div>
+            <p>This month's revenue</p><strong>$@snapshot.MonthSales.ToString("N0")</strong><small>$@SevenDaySales.ToString("N0") in the last 7 days</small>
+        </article>
+        <article class="metric-card" data-tone="gold">
+            <div class="metric-top"><span class="metric-icon gold">GP</span><span class="trend up">@ProfitMargin.ToString("N1")% MARGIN</span></div>
+            <p>Gross profit</p><strong>$@snapshot.MonthProfit.ToString("N0")</strong><small>After product cost and discounts</small>
+        </article>
+        <article class="metric-card" data-tone="coral">
+            <div class="metric-top"><span class="metric-icon coral">LOW</span><span class="trend @(snapshot.LowStockCount > 0 ? "warn" : "up")">@(snapshot.LowStockCount > 0 ? "REVIEW" : "HEALTHY")</span></div>
+            <p>Low-stock variants</p><strong>@snapshot.LowStockCount <b>of @snapshot.VariantCount</b></strong><small>@(snapshot.LowStockCount == 0 ? "Everything is above its threshold" : "At or below replenishment level")</small>
+        </article>
     </section>
 
     <section class="dashboard-grid">
         <article class="panel sales-panel">
-            <div class="panel-title"><div><h2>Sales overview</h2><p>Revenue over the last 7 days</p></div><span class="soft-select">Last 7 days⌄</span></div>
+            <div class="panel-title"><div><h2>Sales overview</h2><p>Completed revenue across the last seven days</p></div><span class="soft-select">7-DAY VIEW</span></div>
             <SalesChart Points="snapshot.SalesTrend" />
         </article>
+
         <article class="panel stock-panel">
-            <div class="panel-title"><div><h2>Inventory health</h2><p>@snapshot.ProductCount active products</p></div><a href="inventory">View inventory →</a></div>
-            <div class="health-ring" style="--health:@HealthPercent"><div><strong>@HealthPercent%</strong><span>Healthy</span></div></div>
-            <div class="health-legend"><p><i class="good"></i><span>In stock</span><strong>@Math.Max(0, snapshot.ProductCount - snapshot.LowStockCount)</strong></p><p><i class="low"></i><span>Low stock</span><strong>@snapshot.LowStockCount</strong></p></div>
+            <div class="panel-title"><div><h2>Inventory health</h2><p>@snapshot.VariantCount active variants</p></div><a href="inventory">Open inventory →</a></div>
+            <div class="health-ring" style="--health:@HealthPercent"><div><strong>@HealthPercent%</strong><span>Healthy stock</span></div></div>
+            <div class="health-legend">
+                <p><i class="good"></i><span>Above threshold</span><strong>@Math.Max(0, snapshot.VariantCount - snapshot.LowStockCount)</strong></p>
+                <p><i class="low"></i><span>Needs attention</span><strong>@snapshot.LowStockCount</strong></p>
+            </div>
         </article>
+
         <article class="panel products-panel">
-            <div class="panel-title"><div><h2>Top products</h2><p>Best sellers this month</p></div><a href="reports">Full report →</a></div>
+            <div class="panel-title"><div><h2>Top products</h2><p>Best sellers this month</p></div><a href="reports">View report →</a></div>
             @if (snapshot.TopProducts.Count == 0)
             {
-                <div class="empty-state">Complete a sale to see product rankings.</div>
+                <div class="empty-state"><strong>No sales yet</strong><div class="mt-2">Product rankings will appear after checkout.</div></div>
             }
             else
             {
                 <div class="rank-list">
-                @for (var i = 0; i < snapshot.TopProducts.Count; i++)
-                {
-                    var product = snapshot.TopProducts[i];
-                    <div class="rank-row"><span class="rank">@(i + 1)</span><span class="product-thumb">@Initials(product.Name)</span><div><strong>@product.Name</strong><small>@product.Quantity sold</small></div><b>$@product.Revenue.ToString("N0")</b></div>
-                }
+                    @for (var i = 0; i < snapshot.TopProducts.Count; i++)
+                    {
+                        var product = snapshot.TopProducts[i];
+                        <div class="rank-row">
+                            <span class="rank">@(i + 1)</span><span class="product-thumb">@Initials(product.Name)</span>
+                            <div class="rank-info"><strong>@product.Name</strong><small>@product.Quantity units sold</small><span class="rank-bar"><i style="width:@(product.Quantity * 100 / MaxTopQuantity)%"></i></span></div>
+                            <b>$@product.Revenue.ToString("N0")</b>
+                        </div>
+                    }
                 </div>
             }
         </article>
+
         <article class="panel quick-panel">
-            <div class="panel-title"><div><h2>Quick actions</h2><p>Common store tasks</p></div></div>
-            <div class="quick-grid"><a href="products/new"><span>＋</span><strong>Add product</strong><small>Create variants</small></a><a href="inventory/receive"><span>⇣</span><strong>Receive stock</strong><small>Log delivery</small></a><a href="pos"><span>▣</span><strong>Open POS</strong><small>Start a sale</small></a><a href="customers"><span>♙</span><strong>Add customer</strong><small>Build loyalty</small></a></div>
+            <div class="panel-title"><div><h2>Quick actions</h2><p>Move straight to your next task</p></div></div>
+            <div class="quick-grid">
+                <a href="products/new"><span>PR</span><strong>Add product</strong><small>Create sizes & colors</small></a>
+                <a href="inventory/receive"><span>IN</span><strong>Receive stock</strong><small>Record a delivery</small></a>
+                <a href="pos"><span>PS</span><strong>Open POS</strong><small>Start checkout</small></a>
+                <a href="customers"><span>CU</span><strong>Customers</strong><small>View purchase history</small></a>
+            </div>
         </article>
     </section>
 }
 
 @code {
     private DashboardSnapshot? snapshot;
+    private string Greeting => DateTime.Now.Hour switch { < 12 => "Good morning", < 17 => "Good afternoon", _ => "Good evening" };
+    private decimal SevenDaySales => snapshot?.SalesTrend.Sum(x => x.Total) ?? 0;
+    private decimal ProfitMargin => snapshot is null || snapshot.MonthSales == 0 ? 0 : snapshot.MonthProfit / snapshot.MonthSales * 100;
+    private int MaxTopQuantity => Math.Max(1, snapshot?.TopProducts.Max(x => x.Quantity) ?? 1);
     private int HealthPercent => snapshot is null || snapshot.VariantCount == 0 ? 100 : Math.Clamp((int)Math.Round(100m - snapshot.LowStockCount * 100m / snapshot.VariantCount), 0, 100);
+
     protected override async Task OnInitializedAsync() => snapshot = await DashboardService.GetSnapshotAsync();
     private static string Initials(string name) => string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
 }

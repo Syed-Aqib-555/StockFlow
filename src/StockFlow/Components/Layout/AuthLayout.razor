@@ -1,0 +1,30 @@
+@inherits LayoutComponentBase
+
+<div class="auth-shell">
+    <aside class="auth-brand-panel">
+        <a class="auth-logo" href="/">
+            <span>SF</span>
+            <strong>StockFlow<small>RETAIL OPERATIONS</small></strong>
+        </a>
+        <div class="auth-story">
+            <span class="auth-kicker">RUN YOUR STORE WITH CLARITY</span>
+            <h2>Every product, sale, and stock movement—under control.</h2>
+            <p>A focused workspace for SAH Store to sell confidently, protect margins, and know exactly what is on the shelf.</p>
+            <div class="auth-benefits">
+                <div><span>01</span><p><strong>Live inventory</strong><small>Variant-level stock you can trust</small></p></div>
+                <div><span>02</span><p><strong>Fast checkout</strong><small>From product search to invoice</small></p></div>
+                <div><span>03</span><p><strong>Clear profit</strong><small>Historical costs preserved</small></p></div>
+            </div>
+        </div>
+        <footer>© @DateTime.Now.Year SAH Store · StockFlow</footer>
+    </aside>
+    <main class="auth-main">
+        <a class="auth-mobile-logo" href="/"><span>SF</span><strong>StockFlow</strong></a>
+        <div class="auth-content">@Body</div>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unexpected error occurred. <a href="." class="reload">Reload</a>
+    <span class="dismiss">×</span>
+</div>

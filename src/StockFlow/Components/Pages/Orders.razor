@@ -8,9 +8,15 @@
 <PageTitle>Orders · StockFlow</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">SALES LEDGER</p><h1>Orders & invoices</h1><p>Completed and voided sales remain available as permanent records.</p></div><a class="btn btn-accent" href="pos">＋ New sale</a></div>
 @if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+<section class="summary-strip" aria-label="Order summary">
+    <div><span>Completed orders</span><strong>@sales.Count(x => x.Status == SaleStatus.Completed)</strong></div>
+    <div><span>Today's orders</span><strong>@sales.Count(x => x.Status == SaleStatus.Completed && x.Date.Date == DateTime.UtcNow.Date)</strong></div>
+    <div><span>Completed revenue</span><strong>$@sales.Where(x => x.Status == SaleStatus.Completed).Sum(x => x.Total).ToString("N0")</strong></div>
+    <div><span>Voided records</span><strong>@sales.Count(x => x.Status == SaleStatus.Cancelled)</strong></div>
+</section>
 <section class="data-panel">
     <div class="toolbar"><div class="toolbar-group"><div class="search-box"><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search order number or customer…" /></div><select class="form-select" @bind="status"><option value="all">All statuses</option><option value="Completed">Completed</option><option value="Cancelled">Voided</option></select></div><span class="muted">@Filtered.Count() orders</span></div>
-    <div class="table-wrap"><table class="sf-table"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Payment</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>
+    <div class="table-wrap"><table class="sf-table"><caption class="visually-hidden">Completed and voided store orders</caption><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Payment</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>
     @foreach(var sale in Filtered){<tr><td><a href="orders/@sale.Id"><strong>@sale.SaleNumber</strong></a></td><td>@sale.Date.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td><td>@(sale.Customer?.Name??"Walk-in customer")</td><td>@sale.Items.Sum(x=>x.Quantity)</td><td>@sale.PaymentMethod</td><td class="money">$@sale.Total.ToString("N2")</td><td><span class="status @(sale.Status==SaleStatus.Completed?"success":"danger")">@(sale.Status==SaleStatus.Completed?"Completed":"Voided")</span></td><td><div class="page-actions"><a class="btn btn-outline btn-sm" href="orders/@sale.Id">Invoice</a>@if(sale.Status==SaleStatus.Completed){<AuthorizeView Roles="Admin"><button class="btn btn-danger-soft btn-sm" @onclick="()=>VoidAsync(sale.Id)">Void</button></AuthorizeView>}</div></td></tr>}
     </tbody></table></div>
 </section>

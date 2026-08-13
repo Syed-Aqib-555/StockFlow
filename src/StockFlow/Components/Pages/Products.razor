@@ -10,12 +10,22 @@
     <div class="page-actions"><AuthorizeView Roles="Admin"><a class="btn btn-outline" href="products/catalog">Categories & suppliers</a><a class="btn btn-accent" href="products/new">＋ Add product</a></AuthorizeView></div>
 </div>
 
+@if (products is not null)
+{
+    <section class="summary-strip" aria-label="Catalog summary">
+        <div><span>Active products</span><strong>@products.Count</strong></div>
+        <div><span>Sellable variants</span><strong>@products.Sum(x => x.Variants.Count)</strong></div>
+        <div><span>Units on hand</span><strong>@products.Sum(x => x.Variants.Sum(v => v.QuantityOnHand))</strong></div>
+        <div><span>Low-stock variants</span><strong class="@(products.Any(x => x.Variants.Any(v => v.QuantityOnHand <= v.LowStockThreshold)) ? "text-danger" : "text-success")">@products.Sum(x => x.Variants.Count(v => v.QuantityOnHand <= v.LowStockThreshold))</strong></div>
+    </section>
+}
+
 <section class="data-panel">
     <div class="toolbar">
         <div class="toolbar-group">
-            <div class="search-box"><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search name, SKU, or color…" /></div>
-            <select class="form-select" @bind="categoryId"><option value="0">All categories</option>@foreach (var category in categories){<option value="@category.Id">@category.Name</option>}</select>
-            <select class="form-select" @bind="stockFilter"><option value="all">All stock levels</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
+            <div class="search-box"><input class="form-control" aria-label="Search products" @bind="search" @bind:event="oninput" placeholder="Search name, SKU, size, or color…" /></div>
+            <select class="form-select" aria-label="Filter by category" @bind="categoryId"><option value="0">All categories</option>@foreach (var category in categories){<option value="@category.Id">@category.Name</option>}</select>
+            <select class="form-select" aria-label="Filter by stock level" @bind="stockFilter"><option value="all">All stock levels</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
         </div>
         <span class="muted">@FilteredProducts.Count() products</span>
     </div>
@@ -25,12 +35,13 @@
     }
     else if (!FilteredProducts.Any())
     {
-        <div class="empty-state">No products match these filters.</div>
+        <div class="empty-state"><strong>No matching products</strong><div class="mt-2">Try a different search term or clear the filters.</div></div>
     }
     else
     {
         <div class="table-wrap">
             <table class="sf-table">
+                <caption class="visually-hidden">Product catalog with variants, quantities, prices, and availability</caption>
                 <thead><tr><th>Product</th><th>Category</th><th>Variants</th><th>Stock</th><th>Price range</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                 @foreach (var product in FilteredProducts)
@@ -54,6 +65,7 @@
 </section>
 
 @code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
     private List<Product>? products;
     private List<Category> categories = [];
     private string search = string.Empty;
@@ -67,6 +79,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        search = Query?.Trim() ?? string.Empty;
         await using var db = await DbFactory.CreateDbContextAsync();
         categories = await db.Categories.AsNoTracking().OrderBy(x => x.Name).ToListAsync();
         products = await db.Products.AsNoTracking().Include(x => x.Category).Include(x => x.Variants).Where(x => x.IsActive).OrderByDescending(x => x.CreatedAt).ToListAsync();

@@ -9,14 +9,19 @@
 <PageTitle>Point of Sale · StockFlow</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">COUNTER · READY</p><h1>Point of Sale</h1><p>Search, select a variant, and complete the sale in one flow.</p></div><a class="btn btn-outline" href="orders">Today’s orders →</a></div>
 @if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+<div class="pos-context">
+    <span class="pos-ready"><i></i> Checkout ready</span>
+    <span>@variants.Count active variants</span>
+    <span>@variants.Count(x => x.QuantityOnHand > 0) available to sell</span>
+</div>
 <div class="pos-layout">
     <section class="catalog-panel">
-        <div class="search-box"><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search product, SKU, color, or scan barcode…" autofocus /></div>
+        <div class="search-box"><input class="form-control" aria-label="Search the POS catalog" @bind="search" @bind:event="oninput" placeholder="Search product, SKU, color, or scan barcode…" autofocus /></div>
         <div class="category-pills"><button class="pill @(categoryId==0?"active":"")" @onclick="()=>categoryId=0">All products</button>@foreach(var category in categories){<button class="pill @(categoryId==category.Id?"active":"")" @onclick="()=>categoryId=category.Id">@category.Name</button>}</div>
         <div class="product-grid">
         @foreach(var item in FilteredVariants)
         {
-            <button class="product-tile" disabled="@(item.QuantityOnHand==0)" @onclick="()=>Add(item)">
+            <button class="product-tile" aria-label="Add @item.Product.Name, @item.Size, @item.Color to the cart" disabled="@(item.QuantityOnHand==0)" @onclick="()=>Add(item)">
                 <span class="tile-stock">@(item.QuantityOnHand==0?"OUT":$"{item.QuantityOnHand} LEFT")</span><img src="@(item.Product.ImageUrl??"favicon.png")" alt="@item.Product.Name" /><div><strong>@item.Product.Name</strong><small>@item.Size · @item.Color · @item.Sku</small><b>$@item.SellingPrice.ToString("N2")</b></div>
             </button>
         }
@@ -27,7 +32,7 @@
     <aside class="cart-panel">
         <div class="cart-header"><h2>Current order</h2><span class="cart-count">@cart.Sum(x=>x.Quantity) ITEMS</span></div>
         <div class="cart-lines">
-            @if(cart.Count==0){<div class="empty-state"><strong>Your cart is empty</strong><div class="mt-2">Select a product to begin.</div></div>}
+            @if(cart.Count==0){<div class="empty-state"><span class="empty-cart-mark">0</span><strong>Your cart is ready</strong><div class="mt-2">Choose an in-stock product to begin checkout.</div></div>}
             @foreach(var line in cart)
             {
                 <div class="cart-line" @key="line.Variant.Id"><div><strong>@line.Variant.Product.Name</strong><small>@line.Variant.Size · @line.Variant.Color · @line.Variant.Sku</small><div class="qty-control"><button @onclick="()=>ChangeQuantity(line,-1)">−</button><b>@line.Quantity</b><button @onclick="()=>ChangeQuantity(line,1)">＋</button><button title="Remove" @onclick="()=>Remove(line)">×</button></div></div><b>$@((line.Quantity*line.Variant.SellingPrice).ToString("N2"))</b></div>
@@ -36,7 +41,7 @@
         <div class="cart-footer">
             <div class="form-grid"><div class="full"><label class="form-label">Customer</label><select class="form-select" @bind="customerId"><option value="">Walk-in customer</option>@foreach(var customer in customers){<option value="@customer.Id">@customer.Name · @customer.Phone</option>}</select></div><div><label class="form-label">Payment</label><select class="form-select" @bind="paymentMethod"><option value="Cash">Cash</option><option value="Card">Card</option></select></div><div><label class="form-label">Discount ($)</label><input class="form-control" type="number" min="0" step="0.01" @bind="discount" /></div></div>
             <div class="total-row"><span>Subtotal</span><strong>$@Subtotal.ToString("N2")</strong></div><div class="total-row"><span>Discount</span><span>− $@discount.ToString("N2")</span></div><div class="total-row grand"><span>Total</span><strong>$@Total.ToString("N2")</strong></div>
-            <button class="btn btn-accent checkout-button" disabled="@(cart.Count==0||processing)" @onclick="CheckoutAsync">@(processing?"Completing sale…":$"Complete sale · ${Total:N2}")</button>
+            <button class="btn btn-accent checkout-button" disabled="@(cart.Count==0||processing)" @onclick="CheckoutAsync"><span>@(processing?"Completing sale…":"Complete sale")</span><strong>$@Total.ToString("N2") →</strong></button>
         </div>
     </aside>
 </div>

@@ -7,10 +7,10 @@
 <div class="page-heading"><div><p class="eyebrow">STOCK CONTROL</p><h1>Inventory</h1><p>Current quantities, low-stock alerts, and a complete movement trail.</p></div><AuthorizeView Roles="Admin"><a class="btn btn-accent" href="inventory/receive">⇣ Receive or adjust stock</a></AuthorizeView></div>
 
 <section class="metric-grid">
-    <article class="metric-card"><div class="metric-top"><span class="metric-icon green">▦</span></div><p>Units on hand</p><strong>@variants.Sum(x=>x.QuantityOnHand)</strong><small>Across all active variants</small></article>
-    <article class="metric-card"><div class="metric-top"><span class="metric-icon gold">!</span></div><p>Low stock</p><strong>@variants.Count(x=>x.QuantityOnHand>0 && x.QuantityOnHand<=x.LowStockThreshold)</strong><small>Ready for replenishment</small></article>
-    <article class="metric-card"><div class="metric-top"><span class="metric-icon coral">×</span></div><p>Out of stock</p><strong>@variants.Count(x=>x.QuantityOnHand==0)</strong><small>Unavailable at the POS</small></article>
-    <article class="metric-card"><div class="metric-top"><span class="metric-icon purple">↕</span></div><p>Stock movements</p><strong>@transactionCount</strong><small>Complete audit entries</small></article>
+    <article class="metric-card"><div class="metric-top"><span class="metric-icon green">QTY</span><span class="trend up">LIVE</span></div><p>Units on hand</p><strong>@variants.Sum(x=>x.QuantityOnHand)</strong><small>Across all active variants</small></article>
+    <article class="metric-card" data-tone="gold"><div class="metric-top"><span class="metric-icon gold">LOW</span><span class="trend warn">REVIEW</span></div><p>Low stock</p><strong>@variants.Count(x=>x.QuantityOnHand>0 && x.QuantityOnHand<=x.LowStockThreshold)</strong><small>Ready for replenishment</small></article>
+    <article class="metric-card" data-tone="coral"><div class="metric-top"><span class="metric-icon coral">OUT</span><span class="trend neutral">POS BLOCKED</span></div><p>Out of stock</p><strong>@variants.Count(x=>x.QuantityOnHand==0)</strong><small>Unavailable at checkout</small></article>
+    <article class="metric-card" data-tone="purple"><div class="metric-top"><span class="metric-icon purple">LOG</span><span class="trend neutral">AUDITED</span></div><p>Stock movements</p><strong>@transactionCount</strong><small>Complete audit entries</small></article>
 </section>
 
 <section class="data-panel">

@@ -1,24 +1,29 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
+<a class="skip-link" href="#main-content">Skip to main content</a>
 <div class="app-shell">
-    <div class="sidebar">
+    <aside class="sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
     <main class="main-panel">
         <header class="topbar">
-            <div class="topbar-search">
-                <span aria-hidden="true">⌕</span>
-                <input aria-label="Quick search" placeholder="Search products, orders, or customers…" />
-                <kbd>⌘ K</kbd>
-            </div>
+            <form class="topbar-search" action="products" method="get" role="search">
+                <span class="search-mark" aria-hidden="true"></span>
+                <input name="q" aria-label="Search products and SKUs" placeholder="Search products or SKUs" autocomplete="off" />
+                <kbd>/</kbd>
+            </form>
             <div class="topbar-actions">
-                <a class="icon-button" href="inventory" title="Low stock alerts">♢</a>
                 <AuthorizeView>
                     <Authorized>
+                        <span class="store-status"><i></i><span>Store online</span></span>
+                        <a class="notification-button" href="inventory" aria-label="Open inventory alerts">
+                            <span aria-hidden="true">!</span><i></i>
+                        </a>
                         <a class="user-chip" href="Account/Manage">
                             <span class="avatar">@(context.User.Identity?.Name?[0].ToString().ToUpperInvariant() ?? "S")</span>
-                            <span><strong>@ShortName(context.User.Identity?.Name)</strong><small>Store team</small></span>
+                            <span><strong>@ShortName(context.User.Identity?.Name)</strong><small>@(context.User.IsInRole("Admin") ? "Administrator" : "Cashier")</small></span>
+                            <span class="chevron" aria-hidden="true">⌄</span>
                         </a>
                     </Authorized>
                     <NotAuthorized>
@@ -28,7 +33,7 @@
             </div>
         </header>
 
-        <article class="page-content">
+        <article class="page-content" id="main-content">
             @Body
         </article>
     </main>
@@ -40,7 +45,7 @@
 }
 
 <div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
+    An unexpected error occurred.
     <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    <span class="dismiss">×</span>
 </div>
