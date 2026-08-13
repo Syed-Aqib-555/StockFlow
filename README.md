@@ -16,8 +16,9 @@ StockFlow is a complete single-store inventory, POS, order, customer, invoice, a
 ## Start locally
 
 1. Open `StockFlow.slnx` in Visual Studio Community 2026.
-2. Confirm the `https` launch profile is selected.
-3. Press `F5`. The database migrates and demo data is created automatically.
+2. Create the dedicated database instance once with `sqllocaldb create StockFlowLocalDb`.
+3. Confirm the `https` launch profile is selected.
+4. Press `F5`. The database migrates and demo data is created automatically.
 
 Demo accounts:
 
