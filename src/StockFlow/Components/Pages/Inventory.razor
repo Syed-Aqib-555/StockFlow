@@ -1,0 +1,32 @@
+@page "/inventory"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Inventory · StockFlow</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">STOCK CONTROL</p><h1>Inventory</h1><p>Current quantities, low-stock alerts, and a complete movement trail.</p></div><AuthorizeView Roles="Admin"><a class="btn btn-accent" href="inventory/receive">⇣ Receive or adjust stock</a></AuthorizeView></div>
+
+<section class="metric-grid">
+    <article class="metric-card"><div class="metric-top"><span class="metric-icon green">▦</span></div><p>Units on hand</p><strong>@variants.Sum(x=>x.QuantityOnHand)</strong><small>Across all active variants</small></article>
+    <article class="metric-card"><div class="metric-top"><span class="metric-icon gold">!</span></div><p>Low stock</p><strong>@variants.Count(x=>x.QuantityOnHand>0 && x.QuantityOnHand<=x.LowStockThreshold)</strong><small>Ready for replenishment</small></article>
+    <article class="metric-card"><div class="metric-top"><span class="metric-icon coral">×</span></div><p>Out of stock</p><strong>@variants.Count(x=>x.QuantityOnHand==0)</strong><small>Unavailable at the POS</small></article>
+    <article class="metric-card"><div class="metric-top"><span class="metric-icon purple">↕</span></div><p>Stock movements</p><strong>@transactionCount</strong><small>Complete audit entries</small></article>
+</section>
+
+<section class="data-panel">
+    <div class="toolbar"><div class="toolbar-group"><div class="search-box"><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search product, SKU, size, color…" /></div><select class="form-select" @bind="filter"><option value="all">All levels</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="healthy">Healthy stock</option></select></div><span class="muted">@Filtered.Count() variants</span></div>
+    <div class="table-wrap"><table class="sf-table"><thead><tr><th>Product / variant</th><th>SKU</th><th>On hand</th><th>Low threshold</th><th>Stock value</th><th>Status</th><th></th></tr></thead><tbody>
+    @foreach(var item in Filtered){<tr><td><div class="cell-product"><img src="@(item.Product.ImageUrl??"favicon.png")" alt=""/><div><strong>@item.Product.Name</strong><small>@item.Size · @item.Color</small></div></div></td><td><span class="sku">@item.Sku</span></td><td><strong>@item.QuantityOnHand</strong></td><td>@item.LowStockThreshold</td><td class="money">$@((item.QuantityOnHand*item.CostPrice).ToString("N0"))</td><td><span class="status @(item.QuantityOnHand==0?"danger":item.QuantityOnHand<=item.LowStockThreshold?"warning":"success")">@(item.QuantityOnHand==0?"Out":item.QuantityOnHand<=item.LowStockThreshold?"Low":"Healthy")</span></td><td><AuthorizeView Roles="Admin"><a class="btn btn-outline btn-sm" href="inventory/receive?variantId=@item.Id">Update</a></AuthorizeView></td></tr>}
+    </tbody></table></div>
+</section>
+
+<section class="data-panel mt-3">
+    <div class="toolbar"><div><strong>Recent stock history</strong><div class="muted mt-1">Every receipt, adjustment, sale, and return</div></div><a class="btn btn-outline btn-sm" href="inventory/receive">Add movement</a></div>
+    <div class="table-wrap"><table class="sf-table"><thead><tr><th>Date</th><th>Product</th><th>Type</th><th>Change</th><th>Balance</th><th>Notes</th></tr></thead><tbody>@foreach(var tx in recent){<tr><td>@tx.Date.ToLocalTime().ToString("dd MMM, HH:mm")</td><td><strong>@tx.Variant.Product.Name</strong><div class="sku">@tx.Variant.Sku</div></td><td><span class="status @(tx.QuantityChange>=0?"success":"warning")">@tx.Type</span></td><td class="@(tx.QuantityChange>=0?"text-success":"text-danger")"><strong>@(tx.QuantityChange>=0?"+":"")@tx.QuantityChange</strong></td><td>@tx.QuantityAfter</td><td class="muted">@tx.Notes</td></tr>}</tbody></table></div>
+</section>
+
+@code{
+    private List<ProductVariant> variants=[];private List<StockTransaction> recent=[];private int transactionCount;private string search="",filter="all";
+    private IEnumerable<ProductVariant> Filtered=>variants.Where(x=>string.IsNullOrWhiteSpace(search)||x.Product.Name.Contains(search,StringComparison.OrdinalIgnoreCase)||x.Sku.Contains(search,StringComparison.OrdinalIgnoreCase)||x.Size.Contains(search,StringComparison.OrdinalIgnoreCase)||x.Color.Contains(search,StringComparison.OrdinalIgnoreCase)).Where(x=>filter switch{"low"=>x.QuantityOnHand>0&&x.QuantityOnHand<=x.LowStockThreshold,"out"=>x.QuantityOnHand==0,"healthy"=>x.QuantityOnHand>x.LowStockThreshold,_=>true});
+    protected override async Task OnInitializedAsync(){await using var db=await DbFactory.CreateDbContextAsync();variants=await db.ProductVariants.AsNoTracking().Include(x=>x.Product).Where(x=>x.IsActive&&x.Product.IsActive).OrderBy(x=>x.Product.Name).ThenBy(x=>x.Size).ToListAsync();transactionCount=await db.StockTransactions.CountAsync();recent=await db.StockTransactions.AsNoTracking().Include(x=>x.Variant).ThenInclude(x=>x.Product).OrderByDescending(x=>x.Date).Take(20).ToListAsync();}
+}
