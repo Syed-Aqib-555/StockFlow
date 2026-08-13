@@ -1,0 +1,18 @@
+@page "/reports"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject ReportService ReportService
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Reports · StockFlow</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">BUSINESS INTELLIGENCE</p><h1>Reports</h1><p>Track revenue, cost, profit, stock risk, and product performance.</p></div><button class="btn btn-outline" @onclick="LoadAsync">Refresh report</button></div>
+@if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+<section class="form-card"><div class="toolbar"><div class="toolbar-group"><div><label class="form-label">From</label><input class="form-control" type="date" @bind="from"/></div><div><label class="form-label">To</label><input class="form-control" type="date" @bind="to"/></div><button class="btn btn-accent align-self-end" @onclick="LoadAsync">Apply dates</button></div><span class="soft-select">Completed sales only</span></div></section>
+@if(report is not null){<section class="report-kpis"><article class="report-kpi"><span>Total revenue</span><strong>$@report.Revenue.ToString("N2")</strong></article><article class="report-kpi"><span>Gross profit</span><strong>$@report.Profit.ToString("N2")</strong></article><article class="report-kpi"><span>Orders</span><strong>@report.Orders</strong></article><article class="report-kpi"><span>Units sold</span><strong>@report.UnitsSold</strong></article></section>
+<div class="dashboard-grid"><section class="data-panel"><div class="toolbar"><div><strong>Daily sales & profit</strong><div class="muted mt-1">A day-by-day financial summary</div></div></div><div class="table-wrap"><table class="sf-table"><thead><tr><th>Date</th><th>Orders</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead><tbody>@foreach(var row in report.DailyRows){<tr><td>@row.Date.ToString("dd MMM yyyy")</td><td>@row.Orders</td><td class="money">$@row.Revenue.ToString("N2")</td><td>$@row.Cost.ToString("N2")</td><td class="money text-success">$@row.Profit.ToString("N2")</td><td>@(row.Revenue==0?0:Math.Round(row.Profit/row.Revenue*100,1))%</td></tr>}</tbody></table></div>@if(report.DailyRows.Count==0){<div class="empty-state">No completed sales in this date range.</div>}</section>
+<section class="data-panel"><div class="toolbar"><div><strong>Low-stock report</strong><div class="muted mt-1">Variants at or below their threshold</div></div><a class="btn btn-outline btn-sm" href="inventory/receive">Receive stock</a></div><div class="rank-list p-3">@foreach(var item in lowStock){<div class="rank-row"><span class="product-thumb">!</span><div><strong>@item.Product.Name</strong><small>@item.Size · @item.Color · @item.Sku</small></div><span class="status @(item.QuantityOnHand==0?"danger":"warning")">@item.QuantityOnHand left</span><a class="btn btn-outline btn-sm" href="inventory/receive?variantId=@item.Id">Update</a></div>}@if(lowStock.Count==0){<div class="empty-state">All variants are above their threshold.</div>}</div></section></div>}
+
+@code{
+    private DateOnly from=DateOnly.FromDateTime(DateTime.Today.AddDays(-30)),to=DateOnly.FromDateTime(DateTime.Today);private ReportSnapshot? report;private List<ProductVariant> lowStock=[];private string? error;
+    protected override async Task OnInitializedAsync()=>await LoadAsync();private async Task LoadAsync(){error=null;try{report=await ReportService.GetAsync(from,to);await using var db=await DbFactory.CreateDbContextAsync();lowStock=await db.ProductVariants.AsNoTracking().Include(x=>x.Product).Where(x=>x.IsActive&&x.Product.IsActive&&x.QuantityOnHand<=x.LowStockThreshold).OrderBy(x=>x.QuantityOnHand).ToListAsync();}catch(Exception ex){error=ex.Message;}}
+}
