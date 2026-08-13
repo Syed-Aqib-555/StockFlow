@@ -1,0 +1,21 @@
+@page "/products/catalog"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Categories & suppliers · StockFlow</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">CATALOG SETTINGS</p><h1>Categories & suppliers</h1><p>Keep product organization and sourcing details current.</p></div><a class="btn btn-outline" href="products">← Products</a></div>
+@if (!string.IsNullOrWhiteSpace(message)){<div class="alert alert-success">@message</div>}
+@if (!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+<div class="dashboard-grid">
+    <section class="form-card"><h2>Categories</h2><p>Used for catalog and POS filters.</p><div class="toolbar-group"><input class="form-control" @bind="categoryName" placeholder="New category name" /><button class="btn btn-accent" @onclick="AddCategoryAsync">Add</button></div><div class="rank-list mt-3">@foreach(var item in categories){<div class="rank-row"><span class="product-thumb">#</span><div><strong>@item.Name</strong><small>@item.Products.Count product(s)</small></div><span></span><span class="status success">Active</span></div>}</div></section>
+    <section class="form-card"><h2>Suppliers</h2><p>Contact details used when receiving stock.</p><div class="form-grid"><input class="form-control" @bind="supplierName" placeholder="Supplier name" /><input class="form-control" @bind="supplierPhone" placeholder="Phone" /><input class="form-control full" @bind="supplierEmail" placeholder="Email" /></div><button class="btn btn-accent mt-3" @onclick="AddSupplierAsync">Add supplier</button><div class="rank-list mt-3">@foreach(var item in suppliers){<div class="rank-row"><span class="product-thumb">S</span><div><strong>@item.Name</strong><small>@item.Phone · @item.Email</small></div><span></span><span class="status neutral">Supplier</span></div>}</div></section>
+</div>
+
+@code {
+    private List<Category> categories=[]; private List<Supplier> suppliers=[]; private string categoryName="",supplierName="",supplierPhone="",supplierEmail=""; private string? message,error;
+    protected override async Task OnInitializedAsync()=>await LoadAsync();
+    private async Task LoadAsync(){await using var db=await DbFactory.CreateDbContextAsync();categories=await db.Categories.Include(x=>x.Products).OrderBy(x=>x.Name).ToListAsync();suppliers=await db.Suppliers.OrderBy(x=>x.Name).ToListAsync();}
+    private async Task AddCategoryAsync(){message=error=null;if(string.IsNullOrWhiteSpace(categoryName)){error="Enter a category name.";return;}try{await using var db=await DbFactory.CreateDbContextAsync();db.Categories.Add(new Category{Name=categoryName.Trim()});await db.SaveChangesAsync();categoryName="";message="Category added.";await LoadAsync();}catch(Exception ex){error=ex.InnerException?.Message??ex.Message;}}
+    private async Task AddSupplierAsync(){message=error=null;if(string.IsNullOrWhiteSpace(supplierName)){error="Enter a supplier name.";return;}await using var db=await DbFactory.CreateDbContextAsync();db.Suppliers.Add(new Supplier{Name=supplierName.Trim(),Phone=supplierPhone.Trim(),Email=supplierEmail.Trim()});await db.SaveChangesAsync();supplierName=supplierPhone=supplierEmail="";message="Supplier added.";await LoadAsync();}
+}
