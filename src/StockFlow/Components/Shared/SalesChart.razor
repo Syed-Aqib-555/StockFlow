@@ -1,0 +1,24 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="chart-wrap"><canvas id="@chartId" aria-label="Seven day sales chart"></canvas></div>
+
+@code {
+    [Parameter] public IReadOnlyList<DailySalesPoint> Points { get; set; } = [];
+    private readonly string chartId = $"sales-chart-{Guid.NewGuid():N}";
+    private IJSObjectReference? module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./stockflow.js");
+        await module.InvokeVoidAsync("renderSalesChart", chartId,
+            Points.Select(x => x.Date.ToString("ddd")).ToArray(),
+            Points.Select(x => x.Total).ToArray());
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null) await module.DisposeAsync();
+    }
+}
