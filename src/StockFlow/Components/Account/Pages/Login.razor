@@ -99,7 +99,16 @@
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl);
+            if (!string.IsNullOrWhiteSpace(ReturnUrl))
+            {
+                RedirectManager.RedirectTo(ReturnUrl);
+            }
+
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            var destination = user is not null && await UserManager.IsInRoleAsync(user, "Admin")
+                ? "admin"
+                : "dashboard";
+            RedirectManager.RedirectTo(destination);
         }
         else if (result.RequiresTwoFactor)
         {

@@ -43,6 +43,7 @@ builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<PosService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<AdminService>();
 
 var app = builder.Build();
 

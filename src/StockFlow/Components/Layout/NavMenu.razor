@@ -20,6 +20,8 @@
         <div class="nav-item"><NavLink class="nav-link" href="customers"><span class="nav-icon" aria-hidden="true">CU</span><span>Customers</span></NavLink></div>
         <div class="nav-item"><NavLink class="nav-link" href="reports"><span class="nav-icon" aria-hidden="true">RP</span><span>Reports</span></NavLink></div>
         <AuthorizeView Roles="Admin">
+            <p class="nav-label">ADMINISTRATION</p>
+            <div class="nav-item"><NavLink class="nav-link" href="admin" Match="NavLinkMatch.All"><span class="nav-icon" aria-hidden="true">AD</span><span>Admin overview</span><span class="nav-badge">ADMIN</span></NavLink></div>
             <div class="nav-item"><NavLink class="nav-link" href="admin/users"><span class="nav-icon" aria-hidden="true">TM</span><span>Team & roles</span></NavLink></div>
             <a class="sidebar-card" href="reports">
                 <span class="sidebar-card-label">STORE PULSE</span>

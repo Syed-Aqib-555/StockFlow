@@ -29,7 +29,9 @@ const motionSelector = [
     '.dashboard-hero', '.page-heading', '.summary-strip', '.metric-card',
     '.panel', '.data-panel', '.form-card', '.pos-context', '.catalog-panel',
     '.cart-panel', '.report-kpi', '.profile-card', '.invoice', '.auth-card',
-    '.product-tile', '.alert'
+    '.product-tile', '.alert', '.admin-hero', '.admin-kpi',
+    '.admin-orders-panel', '.admin-management-panel', '.admin-health-panel',
+    '.admin-activity-panel', '.access-guide'
 ].join(',');
 
 function initializeMotion() {

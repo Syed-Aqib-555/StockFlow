@@ -3,17 +3,223 @@
 @attribute [Authorize(Roles = "Admin")]
 @using Microsoft.AspNetCore.Identity
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
 @inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Team & roles · StockFlow</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">ACCESS CONTROL</p><h1>Team & roles</h1><p>Create secure Admin and Cashier accounts with the right permissions.</p></div><button class="btn btn-accent" @onclick="()=>showForm=!showForm">＋ Add team member</button></div>
-@if(!string.IsNullOrWhiteSpace(message)){<div class="alert alert-success">@message</div>}@if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
-@if(showForm){<EditForm Model="form" OnValidSubmit="AddAsync"><DataAnnotationsValidator/><section class="form-card"><h2>New team member</h2><p>The temporary password can be changed from Account after the first sign-in.</p><div class="form-grid"><div><label class="form-label">Email</label><InputText class="form-control" @bind-Value="form.Email"/><ValidationMessage For="@(()=>form.Email)"/></div><div><label class="form-label">Role</label><InputSelect class="form-select" @bind-Value="form.Role"><option>Cashier</option><option>Admin</option></InputSelect></div><div class="full"><label class="form-label">Temporary password</label><InputText class="form-control" type="password" @bind-Value="form.Password"/><ValidationMessage For="@(()=>form.Password)"/></div></div><div class="page-actions mt-3"><button class="btn btn-accent" type="submit">Create account</button><button class="btn btn-outline" type="button" @onclick="()=>showForm=false">Cancel</button></div></section></EditForm>}
-<section class="profile-list">@foreach(var user in users){<article class="profile-card"><div class="profile-card-head"><span class="profile-avatar">@user.Email[0].ToString().ToUpperInvariant()</span><div><strong>@user.Email</strong><small>@user.Role</small></div></div><div class="mt-3"><span class="status success">Active</span><small class="d-block mt-2">@(user.EmailConfirmed?"Email confirmed":"Email confirmation pending")</small></div></article>}</section>
 
-@code{
-    private List<UserRow> users=[];private bool showForm;private UserForm form=new();private string? message,error;
-    protected override async Task OnInitializedAsync()=>await LoadAsync();private async Task LoadAsync(){users=[];foreach(var user in UserManager.Users.OrderBy(x=>x.Email)){var roles=await UserManager.GetRolesAsync(user);users.Add(new UserRow(user.Email??user.UserName??"Unknown",roles.FirstOrDefault()??"Unassigned",user.EmailConfirmed));}}
-    private async Task AddAsync(){message=error=null;var user=new ApplicationUser{UserName=form.Email.Trim(),Email=form.Email.Trim(),EmailConfirmed=true};var result=await UserManager.CreateAsync(user,form.Password);if(!result.Succeeded){error=string.Join("; ",result.Errors.Select(x=>x.Description));return;}await UserManager.AddToRoleAsync(user,form.Role);message=$"{form.Email} was created as {form.Role}.";form=new();showForm=false;await LoadAsync();}
-    private sealed record UserRow(string Email,string Role,bool EmailConfirmed);private sealed class UserForm{[Required,EmailAddress]public string Email{get;set;}="";[Required,MinLength(8)]public string Password{get;set;}="";public string Role{get;set;}="Cashier";}
+<div class="page-heading">
+    <div><p class="eyebrow">ADMINISTRATION · ACCESS CONTROL</p><h1>Team & roles</h1><p>Create accounts, assign permissions, and control who can access store operations.</p></div>
+    <div class="page-actions"><a class="btn btn-outline" href="admin">← Admin overview</a><button class="btn btn-accent" @onclick="ToggleForm">＋ Add team member</button></div>
+</div>
+
+<section class="summary-strip team-summary">
+    <div><span>Total members</span><strong>@users.Count</strong></div>
+    <div><span>Administrators</span><strong>@users.Count(x => x.Role == "Admin")</strong></div>
+    <div><span>Cashiers</span><strong>@users.Count(x => x.Role == "Cashier")</strong></div>
+    <div><span>Active access</span><strong>@users.Count(x => !x.IsLocked)</strong></div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(message)) { <div class="alert alert-success">@message</div> }
+@if (!string.IsNullOrWhiteSpace(error)) { <div class="alert alert-danger">@error</div> }
+
+@if (showForm)
+{
+    <EditForm Model="form" OnValidSubmit="AddAsync">
+        <DataAnnotationsValidator />
+        <section class="form-card team-create-card">
+            <div class="form-card-heading"><div><span class="section-kicker">NEW ACCOUNT</span><h2>Add a team member</h2><p>Create secure access with the minimum permissions required for the role.</p></div><button class="panel-close" type="button" aria-label="Close form" @onclick="ToggleForm">×</button></div>
+            <div class="form-grid">
+                <div><label class="form-label">Email address</label><InputText class="form-control" autocomplete="email" placeholder="team.member@sahstore.com" @bind-Value="form.Email" /><ValidationMessage For="@(() => form.Email)" /></div>
+                <div><label class="form-label">Access role</label><InputSelect class="form-select" @bind-Value="form.Role"><option value="Cashier">Cashier · sales access</option><option value="Admin">Admin · full access</option></InputSelect></div>
+                <div class="full"><label class="form-label">Temporary password</label><InputText class="form-control" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" @bind-Value="form.Password" /><ValidationMessage For="@(() => form.Password)" /><small class="form-text">Share it privately. The member can change it from Account after signing in.</small></div>
+            </div>
+            <div class="page-actions mt-3"><button class="btn btn-accent" type="submit" disabled="@saving">@(saving ? "Creating account…" : "Create secure account")</button><button class="btn btn-outline" type="button" @onclick="ToggleForm">Cancel</button></div>
+        </section>
+    </EditForm>
+}
+
+<section class="data-panel team-panel">
+    <div class="toolbar"><div><strong>Authorized team</strong><small> Changes to roles and account status apply immediately.</small></div><span class="security-note"><i></i> Role-protected access</span></div>
+    <div class="team-table-wrap">
+        <table class="sf-table team-table">
+            <thead><tr><th>Team member</th><th>Role</th><th>Account status</th><th>Verification</th><th>Actions</th></tr></thead>
+            <tbody>
+                @foreach (var user in users)
+                {
+                    <tr>
+                        <td><div class="team-identity"><span class="profile-avatar">@Initial(user.Email)</span><div><strong>@user.Email</strong><small>@(user.IsCurrent ? "Your account" : "Store team member")</small></div></div></td>
+                        <td>
+                            <select class="form-select role-select" aria-label="Role for @user.Email" @bind="user.Role" disabled="@user.IsCurrent">
+                                <option value="Cashier">Cashier</option><option value="Admin">Administrator</option>
+                            </select>
+                        </td>
+                        <td><span class="status @(user.IsLocked ? "danger" : "success")">@(user.IsLocked ? "Access paused" : "Active")</span></td>
+                        <td><span class="verification-state @(user.EmailConfirmed ? "confirmed" : "pending")"><i></i>@(user.EmailConfirmed ? "Confirmed" : "Pending")</span></td>
+                        <td>
+                            @if (user.IsCurrent)
+                            {
+                                <a class="btn btn-outline btn-sm" href="Account/Manage">Manage my account</a>
+                            }
+                            else
+                            {
+                                <div class="team-actions">
+                                    <button class="btn btn-outline btn-sm" @onclick="() => SaveRoleAsync(user)" disabled="@saving">Save role</button>
+                                    <button class="btn @(user.IsLocked ? "btn-outline" : "btn-danger-soft") btn-sm" @onclick="() => ToggleAccessAsync(user)" disabled="@saving">@(user.IsLocked ? "Restore access" : "Pause access")</button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="access-guide">
+    <div><span>AD</span><div><strong>Administrator</strong><p>Full access to sales, products, inventory, reports, customers, catalog settings, and team permissions.</p></div></div>
+    <div><span>CA</span><div><strong>Cashier</strong><p>Access to checkout and day-to-day order workflows without administrative controls.</p></div></div>
+</section>
+
+@code {
+    private List<UserRow> users = [];
+    private bool showForm;
+    private bool saving;
+    private UserForm form = new();
+    private string? currentUserId;
+    private string? message;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        currentUserId = state.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        users = [];
+        foreach (var user in UserManager.Users.OrderBy(x => x.Email))
+        {
+            var roles = await UserManager.GetRolesAsync(user);
+            users.Add(new UserRow
+            {
+                Id = user.Id,
+                Email = user.Email ?? user.UserName ?? "Unknown",
+                Role = roles.FirstOrDefault() ?? "Cashier",
+                OriginalRole = roles.FirstOrDefault() ?? "Cashier",
+                EmailConfirmed = user.EmailConfirmed,
+                IsLocked = await UserManager.IsLockedOutAsync(user),
+                IsCurrent = user.Id == currentUserId
+            });
+        }
+    }
+
+    private void ToggleForm()
+    {
+        showForm = !showForm;
+        message = error = null;
+    }
+
+    private async Task AddAsync()
+    {
+        message = error = null;
+        saving = true;
+        try
+        {
+            var email = form.Email.Trim();
+            var user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true, LockoutEnabled = true };
+            var result = await UserManager.CreateAsync(user, form.Password);
+            if (!result.Succeeded)
+            {
+                error = string.Join("; ", result.Errors.Select(x => x.Description));
+                return;
+            }
+
+            var roleResult = await UserManager.AddToRoleAsync(user, form.Role);
+            if (!roleResult.Succeeded)
+            {
+                error = string.Join("; ", roleResult.Errors.Select(x => x.Description));
+                return;
+            }
+
+            message = $"{email} was created with {form.Role} access.";
+            form = new();
+            showForm = false;
+            await LoadAsync();
+        }
+        finally { saving = false; }
+    }
+
+    private async Task SaveRoleAsync(UserRow row)
+    {
+        message = error = null;
+        if (row.IsCurrent) { error = "Use another administrator account to change your own role."; return; }
+        if (row.OriginalRole == "Admin" && row.Role != "Admin" && users.Count(x => x.OriginalRole == "Admin" && !x.IsLocked) <= 1)
+        {
+            error = "StockFlow must keep at least one active administrator.";
+            await LoadAsync();
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var target = await UserManager.FindByIdAsync(row.Id);
+            if (target is null) { error = "That account no longer exists."; return; }
+            var existingRoles = await UserManager.GetRolesAsync(target);
+            if (existingRoles.Count > 0) await UserManager.RemoveFromRolesAsync(target, existingRoles);
+            var result = await UserManager.AddToRoleAsync(target, row.Role);
+            if (!result.Succeeded) { error = string.Join("; ", result.Errors.Select(x => x.Description)); return; }
+            message = $"{row.Email} now has {row.Role} access.";
+            await LoadAsync();
+        }
+        finally { saving = false; }
+    }
+
+    private async Task ToggleAccessAsync(UserRow row)
+    {
+        message = error = null;
+        if (row.IsCurrent) { error = "You cannot pause your own administrator access."; return; }
+        if (!row.IsLocked && row.OriginalRole == "Admin" && users.Count(x => x.OriginalRole == "Admin" && !x.IsLocked) <= 1)
+        {
+            error = "StockFlow must keep at least one active administrator.";
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var target = await UserManager.FindByIdAsync(row.Id);
+            if (target is null) { error = "That account no longer exists."; return; }
+            await UserManager.SetLockoutEnabledAsync(target, true);
+            var result = await UserManager.SetLockoutEndDateAsync(target, row.IsLocked ? null : DateTimeOffset.MaxValue);
+            if (!result.Succeeded) { error = string.Join("; ", result.Errors.Select(x => x.Description)); return; }
+            message = row.IsLocked ? $"Access restored for {row.Email}." : $"Access paused for {row.Email}.";
+            await LoadAsync();
+        }
+        finally { saving = false; }
+    }
+
+    private static string Initial(string email) => email.Length == 0 ? "?" : email[0].ToString().ToUpperInvariant();
+
+    private sealed class UserRow
+    {
+        public string Id { get; init; } = "";
+        public string Email { get; init; } = "";
+        public string Role { get; set; } = "Cashier";
+        public string OriginalRole { get; init; } = "Cashier";
+        public bool EmailConfirmed { get; init; }
+        public bool IsLocked { get; init; }
+        public bool IsCurrent { get; init; }
+    }
+
+    private sealed class UserForm
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "";
+        [Required, MinLength(8)] public string Password { get; set; } = "";
+        public string Role { get; set; } = "Cashier";
+    }
 }

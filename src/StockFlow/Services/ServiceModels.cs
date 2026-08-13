@@ -27,6 +27,43 @@ public sealed record DashboardSnapshot(
     IReadOnlyList<TopProduct> TopProducts,
     IReadOnlyList<DailySalesPoint> SalesTrend);
 
+public sealed record AdminRecentSale(
+    int Id,
+    string SaleNumber,
+    DateTime Date,
+    string Customer,
+    decimal Total,
+    PaymentMethod PaymentMethod,
+    SaleStatus Status,
+    int ItemCount);
+
+public sealed record AdminLowStockItem(
+    int VariantId,
+    string ProductName,
+    string Sku,
+    string Option,
+    int Quantity,
+    int Threshold);
+
+public sealed record AdminStockEvent(
+    string ProductName,
+    string Sku,
+    StockTransactionType Type,
+    int QuantityChange,
+    int QuantityAfter,
+    DateTime Date);
+
+public sealed record AdminSnapshot(
+    DashboardSnapshot Operations,
+    decimal InventoryValue,
+    int CustomerCount,
+    int OutOfStockCount,
+    int TeamMemberCount,
+    int AdminCount,
+    IReadOnlyList<AdminRecentSale> RecentSales,
+    IReadOnlyList<AdminLowStockItem> LowStockItems,
+    IReadOnlyList<AdminStockEvent> RecentStockEvents);
+
 public sealed record ReportRow(
     DateOnly Date,
     int Orders,

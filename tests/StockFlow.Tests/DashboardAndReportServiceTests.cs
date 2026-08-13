@@ -48,4 +48,25 @@ public sealed class DashboardAndReportServiceTests
         Assert.Equal(24m, report.Profit);
         Assert.Equal(2, report.UnitsSold);
     }
+
+    [Fact]
+    public async Task AdminSnapshot_CombinesStoreHealthOrdersAndAuditActivity()
+    {
+        var factory = await TestDatabase.CreateAsync(initialStock: 2);
+        var pos = new PosService(factory);
+        await pos.CompleteSaleAsync(
+            new CreateSaleRequest([new CartLineRequest(1, 1)], 1, PaymentMethod.Cash, 0),
+            "admin-1");
+
+        var dashboard = new DashboardService(factory);
+        var snapshot = await new AdminService(factory, dashboard).GetSnapshotAsync();
+
+        Assert.Equal(8m, snapshot.InventoryValue);
+        Assert.Equal(1, snapshot.CustomerCount);
+        Assert.Equal(1, snapshot.Operations.LowStockCount);
+        Assert.Single(snapshot.RecentSales);
+        Assert.Single(snapshot.LowStockItems);
+        Assert.Single(snapshot.RecentStockEvents);
+        Assert.Equal("Test Customer", snapshot.RecentSales[0].Customer);
+    }
 }

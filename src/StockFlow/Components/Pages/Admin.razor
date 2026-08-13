@@ -1,0 +1,171 @@
+@page "/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminService AdminService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Admin overview · StockFlow</PageTitle>
+
+<section class="admin-hero">
+    <div class="admin-hero-copy">
+        <span class="admin-secure-badge"><i></i> ADMIN CONTROL CENTER</span>
+        <h1>Good @TimeOfDay, <em>@AdminName.</em></h1>
+        <p>Monitor store performance, protect inventory, and manage your team from one workspace.</p>
+    </div>
+    <div class="admin-hero-actions">
+        <span class="admin-live-date"><small>OPERATING DATE</small><strong>@DateTime.Now.ToString("dd MMM yyyy")</strong></span>
+        <a class="btn btn-accent" href="reports">Open full reports <span aria-hidden="true">→</span></a>
+    </div>
+</section>
+
+@if (snapshot is null)
+{
+    <div class="loading-card">Preparing the administration workspace…</div>
+}
+else
+{
+    <section class="admin-kpi-grid" aria-label="Administration summary">
+        <article class="admin-kpi" data-tone="lime">
+            <div class="admin-kpi-head"><span>SA</span><small>LIVE TODAY</small></div>
+            <p>Sales today</p>
+            <strong>$@snapshot.Operations.TodaySales.ToString("N0")</strong>
+            <small>@snapshot.Operations.OrdersToday completed @(snapshot.Operations.OrdersToday == 1 ? "order" : "orders")</small>
+        </article>
+        <article class="admin-kpi" data-tone="violet">
+            <div class="admin-kpi-head"><span>MR</span><small>MONTH TO DATE</small></div>
+            <p>Monthly revenue</p>
+            <strong>$@snapshot.Operations.MonthSales.ToString("N0")</strong>
+            <small>$@snapshot.Operations.MonthProfit.ToString("N0") gross profit</small>
+        </article>
+        <article class="admin-kpi" data-tone="amber">
+            <div class="admin-kpi-head"><span>IV</span><small>AT COST</small></div>
+            <p>Inventory value</p>
+            <strong>$@snapshot.InventoryValue.ToString("N0")</strong>
+            <small>@snapshot.Operations.VariantCount active variants</small>
+        </article>
+        <article class="admin-kpi" data-tone="blue">
+            <div class="admin-kpi-head"><span>TM</span><small>ACCESS CONTROL</small></div>
+            <p>Team members</p>
+            <strong>@snapshot.TeamMemberCount</strong>
+            <small>@snapshot.AdminCount administrators · @snapshot.CustomerCount customers</small>
+        </article>
+    </section>
+
+    <section class="admin-layout">
+        <div class="admin-primary">
+            <article class="panel admin-orders-panel">
+                <div class="panel-title">
+                    <div><span class="section-kicker">COMMERCE</span><h2>Recent orders</h2><p>The latest transactions across every counter.</p></div>
+                    <a href="orders">View all orders →</a>
+                </div>
+                @if (snapshot.RecentSales.Count == 0)
+                {
+                    <div class="empty-state"><strong>No orders yet</strong><div class="mt-2">Completed sales will appear here.</div></div>
+                }
+                else
+                {
+                    <div class="admin-order-list">
+                        @foreach (var sale in snapshot.RecentSales)
+                        {
+                            <a class="admin-order-row" href="orders/@sale.Id">
+                                <span class="order-token">@sale.SaleNumber.Replace("SF-", "")</span>
+                                <span class="order-customer"><strong>@sale.Customer</strong><small>@sale.ItemCount @(sale.ItemCount == 1 ? "item" : "items") · @sale.PaymentMethod</small></span>
+                                <span class="order-time">@LocalTime(sale.Date)</span>
+                                <span class="status @(sale.Status == SaleStatus.Completed ? "success" : "danger")">@sale.Status</span>
+                                <strong class="order-total">$@sale.Total.ToString("N2")</strong>
+                                <span class="row-arrow" aria-hidden="true">→</span>
+                            </a>
+                        }
+                    </div>
+                }
+            </article>
+
+            <article class="panel admin-management-panel">
+                <div class="panel-title"><div><span class="section-kicker">MANAGEMENT</span><h2>Store controls</h2><p>Direct access to the areas administrators manage most.</p></div></div>
+                <div class="admin-command-grid">
+                    <a href="products"><span>PR</span><div><strong>Product catalog</strong><small>Products, pricing and variants</small></div><b>→</b></a>
+                    <a href="inventory"><span>IN</span><div><strong>Inventory control</strong><small>Stock levels and adjustments</small></div><b>→</b></a>
+                    <a href="inventory/receive"><span>RC</span><div><strong>Receive stock</strong><small>Record supplier deliveries</small></div><b>→</b></a>
+                    <a href="customers"><span>CU</span><div><strong>Customer records</strong><small>Profiles and purchase history</small></div><b>→</b></a>
+                    <a href="admin/users"><span>TM</span><div><strong>Team & roles</strong><small>Accounts and permissions</small></div><b>→</b></a>
+                    <a href="products/catalog"><span>ST</span><div><strong>Catalog settings</strong><small>Categories and suppliers</small></div><b>→</b></a>
+                </div>
+            </article>
+        </div>
+
+        <aside class="admin-secondary">
+            <article class="panel admin-health-panel">
+                <div class="panel-title"><div><span class="section-kicker">STORE HEALTH</span><h2>Inventory attention</h2></div><a href="inventory">Open inventory →</a></div>
+                <div class="admin-health-score">
+                    <div class="admin-health-ring" style="--score:@StockHealth"><strong>@StockHealth%</strong><span>healthy</span></div>
+                    <div><strong>@HealthyVariants</strong><span>variants above threshold</span><small>@snapshot.OutOfStockCount out of stock</small></div>
+                </div>
+                @if (snapshot.LowStockItems.Count == 0)
+                {
+                    <div class="admin-all-clear"><i>✓</i><div><strong>Stock levels are healthy</strong><small>No variants need immediate attention.</small></div></div>
+                }
+                else
+                {
+                    <div class="admin-alert-list">
+                        @foreach (var item in snapshot.LowStockItems.Take(4))
+                        {
+                            <a href="inventory">
+                                <span class="stock-token @(item.Quantity == 0 ? "empty" : "low")">@item.Quantity</span>
+                                <span><strong>@item.ProductName</strong><small>@item.Option · @item.Sku</small></span>
+                                <b>@(item.Quantity == 0 ? "OUT" : "LOW")</b>
+                            </a>
+                        }
+                    </div>
+                }
+            </article>
+
+            <article class="panel admin-activity-panel">
+                <div class="panel-title"><div><span class="section-kicker">AUDIT TRAIL</span><h2>Recent stock activity</h2></div></div>
+                <div class="admin-timeline">
+                    @foreach (var item in snapshot.RecentStockEvents)
+                    {
+                        <div class="admin-timeline-row">
+                            <i class="@(item.QuantityChange >= 0 ? "positive" : "negative")"></i>
+                            <div><strong>@item.Type · @item.ProductName</strong><small>@item.Sku · @RelativeTime(item.Date)</small></div>
+                            <b class="@(item.QuantityChange >= 0 ? "text-success" : "text-danger")">@(item.QuantityChange > 0 ? "+" : "")@item.QuantityChange</b>
+                        </div>
+                    }
+                </div>
+                <a class="admin-panel-footer" href="inventory">Review complete inventory history <span>→</span></a>
+            </article>
+        </aside>
+    </section>
+}
+
+@code {
+    private AdminSnapshot? snapshot;
+    private string AdminName = "Admin";
+    private string TimeOfDay => DateTime.Now.Hour switch { < 12 => "morning", < 17 => "afternoon", _ => "evening" };
+    private int HealthyVariants => snapshot is null ? 0 : Math.Max(0, snapshot.Operations.VariantCount - snapshot.Operations.LowStockCount);
+    private int StockHealth => snapshot is null || snapshot.Operations.VariantCount == 0
+        ? 100
+        : Math.Clamp((int)Math.Round(HealthyVariants * 100m / snapshot.Operations.VariantCount), 0, 100);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authentication = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var email = authentication.User.Identity?.Name;
+        AdminName = string.IsNullOrWhiteSpace(email) ? "Admin" : ToDisplayName(email.Split('@')[0]);
+        snapshot = await AdminService.GetSnapshotAsync();
+    }
+
+    private static string ToDisplayName(string value) =>
+        string.Join(" ", value.Split(['.', '_', '-'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
+
+    private static string LocalTime(DateTime date) => date.ToLocalTime().ToString("dd MMM · HH:mm");
+
+    private static string RelativeTime(DateTime date)
+    {
+        var elapsed = DateTime.UtcNow - date.ToUniversalTime();
+        if (elapsed.TotalMinutes < 1) return "just now";
+        if (elapsed.TotalHours < 1) return $"{(int)elapsed.TotalMinutes}m ago";
+        if (elapsed.TotalDays < 1) return $"{(int)elapsed.TotalHours}h ago";
+        return date.ToLocalTime().ToString("dd MMM");
+    }
+}
