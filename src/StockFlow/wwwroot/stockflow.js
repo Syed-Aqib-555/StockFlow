@@ -98,3 +98,18 @@ if (!window.stockFlowKeyboardBound) {
         }
     });
 }
+
+if (!window.stockFlowPasswordToggleBound) {
+    window.stockFlowPasswordToggleBound = true;
+    document.addEventListener('click', event => {
+        const button = event.target.closest('[data-password-toggle]');
+        if (!button) return;
+        const input = document.getElementById(button.dataset.passwordToggle);
+        if (!(input instanceof HTMLInputElement)) return;
+        const revealing = input.type === 'password';
+        input.type = revealing ? 'text' : 'password';
+        button.textContent = revealing ? 'Hide' : 'Show';
+        button.setAttribute('aria-pressed', String(revealing));
+        input.focus();
+    });
+}

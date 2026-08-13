@@ -33,7 +33,10 @@
         </div>
         <div class="field-stack">
             <div class="field-label-row"><label for="Input.Password">Password</label><a href="Account/ForgotPassword">Forgot password?</a></div>
-            <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control auth-input" autocomplete="current-password" aria-required="true" placeholder="Enter your password" />
+            <div class="password-input-wrap">
+                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control auth-input" autocomplete="current-password" aria-required="true" placeholder="Enter your password" />
+                <button class="password-toggle" type="button" data-password-toggle="Input.Password" aria-pressed="false">Show</button>
+            </div>
             <ValidationMessage For="() => Input.Password" />
         </div>
         <label class="remember-row">
@@ -42,13 +45,19 @@
         </label>
         <button type="submit" class="btn btn-dark auth-submit">Sign in to StockFlow <span aria-hidden="true">→</span></button>
 
+        <button type="submit" name="Input.DemoAccess" value="true" class="demo-login-button">
+            <span class="demo-access-icon">AD</span>
+            <span><strong>Enter as demo administrator</strong><small>No typing required · opens the admin control center</small></span>
+            <b aria-hidden="true">→</b>
+        </button>
+
         <div class="auth-divider"><span>or continue with</span></div>
         <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email" class="btn btn-outline auth-secondary">Use a passkey</PasskeySubmit>
     </EditForm>
 
     <div class="demo-access">
         <span class="demo-access-icon">i</span>
-        <div><strong>Portfolio demo access</strong><small>Admin: admin@stockflow.local · Password: StockFlow123!</small></div>
+        <div><strong>Manual admin credentials</strong><small>admin@stockflow.local · StockFlow123!</small></div>
     </div>
     <p class="auth-support">Need a team account? Ask your StockFlow administrator.</p>
 </section>
@@ -79,6 +88,13 @@
 
     public async Task LoginUser()
     {
+        if (Input.DemoAccess)
+        {
+            Input.Email = DatabaseInitializer.AdminEmail;
+            Input.Password = DatabaseInitializer.DemoPassword;
+            Input.RememberMe = false;
+        }
+
         if (!string.IsNullOrEmpty(Input.Passkey?.Error))
         {
             errorMessage = $"Error: {Input.Passkey.Error}";
@@ -135,6 +151,8 @@
 
         [Display(Name = "Remember me?")]
         public bool RememberMe { get; set; }
+
+        public bool DemoAccess { get; set; }
 
         public PasskeyInputModel? Passkey { get; set; }
     }

@@ -13,6 +13,7 @@ public static class DatabaseInitializer
     public static async Task InitializeAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
+        var environment = services.GetRequiredService<IHostEnvironment>();
         await db.Database.MigrateAsync();
 
         var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
@@ -25,8 +26,8 @@ public static class DatabaseInitializer
             }
         }
 
-        var admin = await EnsureUserAsync(userManager, AdminEmail, "Admin");
-        await EnsureUserAsync(userManager, CashierEmail, "Cashier");
+        var admin = await EnsureUserAsync(userManager, AdminEmail, "Admin", environment.IsDevelopment());
+        await EnsureUserAsync(userManager, CashierEmail, "Cashier", environment.IsDevelopment());
 
         if (await db.Products.AnyAsync())
         {
@@ -173,7 +174,8 @@ public static class DatabaseInitializer
     private static async Task<ApplicationUser> EnsureUserAsync(
         UserManager<ApplicationUser> userManager,
         string email,
-        string role)
+        string role,
+        bool restoreDemoAccess)
     {
         var user = await userManager.FindByEmailAsync(email);
         if (user is null)
@@ -195,6 +197,23 @@ public static class DatabaseInitializer
         {
             await userManager.AddToRoleAsync(user, role);
         }
+
+        if (restoreDemoAccess)
+        {
+            if (!await userManager.CheckPasswordAsync(user, DemoPassword))
+            {
+                var resetToken = await userManager.GeneratePasswordResetTokenAsync(user);
+                var resetResult = await userManager.ResetPasswordAsync(user, resetToken, DemoPassword);
+                if (!resetResult.Succeeded)
+                {
+                    throw new InvalidOperationException(string.Join("; ", resetResult.Errors.Select(x => x.Description)));
+                }
+            }
+
+            await userManager.SetLockoutEndDateAsync(user, null);
+            await userManager.ResetAccessFailedCountAsync(user);
+        }
+
         return user;
     }
 }
