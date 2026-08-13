@@ -1,0 +1,20 @@
+## .NET build output
+bin/
+obj/
+artifacts/
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+
+## Local data and secrets
+*.db
+*.db-shm
+*.db-wal
+appsettings.Local.json
+.appdata/
+
+## OS files
+.DS_Store
+Thumbs.db
