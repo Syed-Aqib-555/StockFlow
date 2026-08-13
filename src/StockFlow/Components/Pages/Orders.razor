@@ -1,0 +1,23 @@
+@page "/orders"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject PosService PosService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Orders · StockFlow</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">SALES LEDGER</p><h1>Orders & invoices</h1><p>Completed and voided sales remain available as permanent records.</p></div><a class="btn btn-accent" href="pos">＋ New sale</a></div>
+@if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+<section class="data-panel">
+    <div class="toolbar"><div class="toolbar-group"><div class="search-box"><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search order number or customer…" /></div><select class="form-select" @bind="status"><option value="all">All statuses</option><option value="Completed">Completed</option><option value="Cancelled">Voided</option></select></div><span class="muted">@Filtered.Count() orders</span></div>
+    <div class="table-wrap"><table class="sf-table"><thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Payment</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>
+    @foreach(var sale in Filtered){<tr><td><a href="orders/@sale.Id"><strong>@sale.SaleNumber</strong></a></td><td>@sale.Date.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td><td>@(sale.Customer?.Name??"Walk-in customer")</td><td>@sale.Items.Sum(x=>x.Quantity)</td><td>@sale.PaymentMethod</td><td class="money">$@sale.Total.ToString("N2")</td><td><span class="status @(sale.Status==SaleStatus.Completed?"success":"danger")">@(sale.Status==SaleStatus.Completed?"Completed":"Voided")</span></td><td><div class="page-actions"><a class="btn btn-outline btn-sm" href="orders/@sale.Id">Invoice</a>@if(sale.Status==SaleStatus.Completed){<AuthorizeView Roles="Admin"><button class="btn btn-danger-soft btn-sm" @onclick="()=>VoidAsync(sale.Id)">Void</button></AuthorizeView>}</div></td></tr>}
+    </tbody></table></div>
+</section>
+
+@code{
+    private List<Sale> sales=[];private string search="",status="all";private string? error;
+    private IEnumerable<Sale> Filtered=>sales.Where(x=>status=="all"||x.Status.ToString()==status).Where(x=>string.IsNullOrWhiteSpace(search)||x.SaleNumber.Contains(search,StringComparison.OrdinalIgnoreCase)||(x.Customer?.Name.Contains(search,StringComparison.OrdinalIgnoreCase)??false));
+    protected override async Task OnInitializedAsync()=>await LoadAsync();private async Task LoadAsync(){await using var db=await DbFactory.CreateDbContextAsync();sales=await db.Sales.AsNoTracking().Include(x=>x.Customer).Include(x=>x.Items).OrderByDescending(x=>x.Date).ToListAsync();}
+    private async Task VoidAsync(int id){error=null;try{var user=(await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;var userId=user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;await PosService.VoidSaleAsync(id,"Voided by an administrator from the orders ledger",userId);await LoadAsync();}catch(Exception ex){error=ex.Message;}}
+}
