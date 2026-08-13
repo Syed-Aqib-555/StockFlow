@@ -19,6 +19,8 @@
     --radius-lg: 20px;
     --shadow-sm: 0 1px 2px rgba(22,34,28,.03), 0 8px 22px rgba(22,34,28,.025);
     --shadow-md: 0 16px 45px rgba(22,34,28,.075);
+    --ease-out: cubic-bezier(.22,1,.36,1);
+    --ease-spring: cubic-bezier(.2,.85,.32,1.22);
 }
 
 * { box-sizing: border-box; }
@@ -123,7 +125,47 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 .valid.modified:not([type=checkbox]){outline:1px solid #8aaa2f}.invalid{outline:1px solid #d85c50}.validation-message{color:#b8473d;font-size:.63rem;margin-top:1px}.blazor-error-boundary{background:#a84037;padding:1rem;color:#fff}.blazor-error-boundary::after{content:"An error has occurred."}#blazor-error-ui{color-scheme:light only;background:#fff4cf;bottom:0;box-shadow:0 -1px 4px rgba(0,0,0,.15);display:none;left:0;padding:.75rem 1.25rem;position:fixed;width:100%;z-index:1000}#blazor-error-ui .dismiss{cursor:pointer;position:absolute;right:.75rem}
 
+/* Motion and interaction layer */
+.btn{position:relative;isolation:isolate;overflow:hidden;transition:transform .2s var(--ease-out),box-shadow .2s ease,background .2s ease,border-color .2s ease}
+.btn::after{content:"";position:absolute;z-index:-1;inset:-2px;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.34),transparent);transform:translateX(-210%) skewX(-18deg);transition:transform .62s var(--ease-out);pointer-events:none}
+.btn:hover:not(:disabled)::after{transform:translateX(390%) skewX(-18deg)}
+
+.dashboard-hero::before{content:"";position:absolute;width:220px;height:220px;right:11%;top:-170px;border-radius:50%;background:rgba(216,240,100,.13);filter:blur(4px);animation:hero-drift 8s ease-in-out infinite alternate}
+.hero-date i,.pos-ready i{box-shadow:0 0 0 0 rgba(167,196,55,.38);animation:signal-pulse 2.4s ease-out infinite}
+
+.metric-card{transition:transform .28s var(--ease-out),box-shadow .28s ease,border-color .28s ease}
+.metric-card:hover{transform:translateY(-4px);border-color:#d2ddd7;box-shadow:0 16px 36px rgba(22,34,28,.075)}
+.metric-card::after{content:"";position:absolute;width:125px;height:125px;right:-80px;top:-82px;border-radius:50%;background:color-mix(in srgb,var(--metric-color,#b5cc52) 16%,transparent);transition:transform .45s var(--ease-out),opacity .3s ease;opacity:.52}
+.metric-card:hover::after{transform:scale(1.28);opacity:.85}
+.panel{transition:border-color .25s ease,box-shadow .25s ease}
+.panel:hover{border-color:#d4ddd8;box-shadow:0 12px 34px rgba(22,34,28,.045)}
+
+.health-ring{--ring-progress:var(--health);background:conic-gradient(#b7d34c calc(var(--ring-progress)*1%),#f1b153 0 calc((var(--ring-progress) + 10)*1%),#e97061 0);animation:ring-reveal 1.05s .18s var(--ease-out) both}
+.rank-bar i{transform-origin:left;animation:bar-grow .8s .3s var(--ease-out) both}
+.rank-row:nth-child(2) .rank-bar i{animation-delay:.38s}.rank-row:nth-child(3) .rank-bar i{animation-delay:.46s}.rank-row:nth-child(4) .rank-bar i{animation-delay:.54s}.rank-row:nth-child(5) .rank-bar i{animation-delay:.62s}
+
+.alert{animation:alert-in .42s var(--ease-out) both}
+.product-tile{transition:transform .25s var(--ease-out),border-color .2s ease,box-shadow .25s ease}
+.product-tile:hover:not(:disabled){border-color:#b8ca77;box-shadow:0 14px 32px rgba(35,55,45,.11);transform:translateY(-4px)}
+.product-tile:active:not(:disabled){transform:translateY(-1px) scale(.985);transition-duration:.08s}
+.product-tile img{transition:transform .42s var(--ease-out),filter .3s ease}
+.product-tile:hover:not(:disabled) img{transform:scale(1.045);filter:saturate(1.04)}
+.cart-count{transition:transform .22s var(--ease-spring)}
+.cart-line{animation:cart-line-in .35s var(--ease-out) both}
+.qty-control button{transition:transform .14s ease,background .14s ease,border-color .14s ease}
+.qty-control button:hover{transform:translateY(-1px)}.qty-control button:active{transform:scale(.9)}
+
+@property --ring-progress{syntax:"<number>";inherits:false;initial-value:0}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes hero-drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-22px,24px,0) scale(1.08)}}
+@keyframes signal-pulse{0%{box-shadow:0 0 0 0 rgba(167,196,55,.38)}65%,100%{box-shadow:0 0 0 7px rgba(167,196,55,0)}}
+@keyframes ring-reveal{from{--ring-progress:0;transform:rotate(-8deg) scale(.94)}to{--ring-progress:var(--health);transform:rotate(0) scale(1)}}
+@keyframes bar-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes cart-line-in{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes alert-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+.motion-ready [data-motion]{opacity:0;translate:0 14px;transition:opacity .56s var(--ease-out),translate .56s var(--ease-out);transition-delay:var(--motion-delay,0ms)}
+.motion-ready [data-motion].motion-visible{opacity:1;translate:0 0}
 @media(max-width:1180px){.metric-grid{grid-template-columns:1fr 1fr}.product-grid{grid-template-columns:1fr 1fr}.variant-row{grid-template-columns:repeat(3,1fr)}.variant-row button{align-self:end}.profile-list{grid-template-columns:1fr 1fr}}
 @media(max-width:980px){.dashboard-grid,.pos-layout{grid-template-columns:1fr}.cart-panel{position:static}.report-kpis{grid-template-columns:1fr 1fr}.dashboard-hero{min-height:155px}}
 @media(max-width:650px){.page-heading,.dashboard-hero{align-items:flex-start;flex-direction:column}.dashboard-hero{padding:25px 22px}.hero-actions{width:100%;justify-content:space-between}.metric-grid{grid-template-columns:1fr}.summary-strip{grid-template-columns:1fr 1fr}.summary-strip>div:nth-child(odd){border-left:0}.summary-strip>div:nth-child(n+3){border-top:1px solid var(--line-soft)}.product-grid{grid-template-columns:1fr 1fr}.quick-grid,.form-grid,.profile-list{grid-template-columns:1fr}.form-grid .full{grid-column:auto}.variant-row{grid-template-columns:1fr 1fr}.search-box{min-width:100%}.toolbar-group{width:100%}.report-kpis{grid-template-columns:1fr 1fr}.invoice{padding:23px}.invoice-parties{grid-template-columns:1fr}.pagination-row{align-items:flex-start;gap:8px;flex-direction:column}}
