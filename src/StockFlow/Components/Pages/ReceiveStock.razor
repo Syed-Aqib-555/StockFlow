@@ -1,0 +1,26 @@
+@page "/inventory/receive"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject InventoryService InventoryService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Receive stock · StockFlow</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">INVENTORY MOVEMENT</p><h1>Receive or adjust stock</h1><p>Every update creates an immutable stock transaction for the audit trail.</p></div><a class="btn btn-outline" href="inventory">← Inventory</a></div>
+@if(!string.IsNullOrWhiteSpace(success)){<div class="alert alert-success">@success</div>}@if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+<section class="form-card">
+    <h2>Movement details</h2><p>Select the exact size and color, then record why the quantity changed.</p>
+    <div class="form-grid">
+        <div class="full"><label class="form-label">Product variant</label><select class="form-select" @bind="variantId"><option value="0">Choose product, size, and color</option>@foreach(var item in variants){<option value="@item.Id">@item.Product.Name — @item.Size / @item.Color — @item.Sku (@item.QuantityOnHand available)</option>}</select></div>
+        <div><label class="form-label">Movement type</label><select class="form-select" @bind="movement"><option value="Received">Stock received (+)</option><option value="Return">Customer return (+)</option><option value="Damaged">Damaged / missing (-)</option><option value="Adjustment">Manual adjustment (+ or -)</option></select></div>
+        <div><label class="form-label">Quantity @(movement=="Adjustment"?"change":"")</label><input class="form-control" type="number" @bind="quantity" min="@(movement=="Adjustment"?null:"1")" /><div class="form-text">@(movement=="Adjustment"?"Use a negative number to reduce stock.":"Enter a positive number.")</div></div>
+        <div class="full"><label class="form-label">Notes</label><textarea class="form-control" rows="3" @bind="notes" placeholder="e.g. Supplier delivery #1042 or two items damaged during handling"></textarea></div>
+    </div>
+    <div class="page-actions mt-3"><button class="btn btn-accent" disabled="@saving" @onclick="SubmitAsync">@(saving?"Saving movement…":"Save stock movement")</button><a class="btn btn-outline" href="inventory">Cancel</a></div>
+</section>
+
+@code{
+    [SupplyParameterFromQuery] public int? VariantId{get;set;} private List<ProductVariant> variants=[];private int variantId;private int quantity=1;private string movement="Received",notes="";private bool saving;private string? success,error;
+    protected override async Task OnInitializedAsync(){await using var db=await DbFactory.CreateDbContextAsync();variants=await db.ProductVariants.AsNoTracking().Include(x=>x.Product).Where(x=>x.IsActive&&x.Product.IsActive).OrderBy(x=>x.Product.Name).ToListAsync();variantId=VariantId??0;}
+    private async Task SubmitAsync(){success=error=null;if(variantId==0){error="Choose a product variant.";return;}if(quantity==0){error="Quantity cannot be zero.";return;}if(string.IsNullOrWhiteSpace(notes)){error="Add a note so this movement can be audited.";return;}saving=true;try{var user=(await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;var userId=user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;var type=Enum.Parse<StockTransactionType>(movement);var change=movement switch{"Received" or "Return"=>Math.Abs(quantity),"Damaged"=>-Math.Abs(quantity),_=>quantity};if(type==StockTransactionType.Received)await InventoryService.ReceiveAsync(variantId,change,notes,userId);else await InventoryService.AdjustAsync(variantId,change,type,notes,userId);success="Stock movement saved. The on-hand balance and history are now up to date.";quantity=1;notes="";await OnInitializedAsync();}catch(Exception ex){error=ex.Message;}finally{saving=false;}}
+}
