@@ -1,0 +1,66 @@
+@page "/"
+@page "/dashboard"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject DashboardService DashboardService
+
+<PageTitle>Dashboard · StockFlow</PageTitle>
+
+<div class="page-heading">
+    <div><p class="eyebrow">THURSDAY · LIVE OVERVIEW</p><h1>Good morning, <em>SAH Store.</em></h1><p>Here’s what’s happening with your store today.</p></div>
+    <a class="btn btn-accent" href="pos"><span>＋</span> New sale</a>
+</div>
+
+@if (snapshot is null)
+{
+    <div class="loading-card">Loading your store overview…</div>
+}
+else
+{
+    <section class="metric-grid">
+        <article class="metric-card"><div class="metric-top"><span class="metric-icon green">↗</span><span class="trend up">↑ 12.4%</span></div><p>Today's sales</p><strong>$@snapshot.TodaySales.ToString("N0")</strong><small>Across @snapshot.OrdersToday orders</small></article>
+        <article class="metric-card"><div class="metric-top"><span class="metric-icon purple">◒</span><span class="trend up">↑ 8.1%</span></div><p>This month</p><strong>$@snapshot.MonthSales.ToString("N0")</strong><small>Revenue to date</small></article>
+        <article class="metric-card"><div class="metric-top"><span class="metric-icon gold">◇</span><span class="trend up">↑ 6.8%</span></div><p>Monthly profit</p><strong>$@snapshot.MonthProfit.ToString("N0")</strong><small>After cost and discounts</small></article>
+        <article class="metric-card"><div class="metric-top"><span class="metric-icon coral">!</span><span class="trend warn">Needs attention</span></div><p>Low stock</p><strong>@snapshot.LowStockCount <b>variants</b></strong><small>At or below threshold</small></article>
+    </section>
+
+    <section class="dashboard-grid">
+        <article class="panel sales-panel">
+            <div class="panel-title"><div><h2>Sales overview</h2><p>Revenue over the last 7 days</p></div><span class="soft-select">Last 7 days⌄</span></div>
+            <SalesChart Points="snapshot.SalesTrend" />
+        </article>
+        <article class="panel stock-panel">
+            <div class="panel-title"><div><h2>Inventory health</h2><p>@snapshot.ProductCount active products</p></div><a href="inventory">View inventory →</a></div>
+            <div class="health-ring" style="--health:@HealthPercent"><div><strong>@HealthPercent%</strong><span>Healthy</span></div></div>
+            <div class="health-legend"><p><i class="good"></i><span>In stock</span><strong>@Math.Max(0, snapshot.ProductCount - snapshot.LowStockCount)</strong></p><p><i class="low"></i><span>Low stock</span><strong>@snapshot.LowStockCount</strong></p></div>
+        </article>
+        <article class="panel products-panel">
+            <div class="panel-title"><div><h2>Top products</h2><p>Best sellers this month</p></div><a href="reports">Full report →</a></div>
+            @if (snapshot.TopProducts.Count == 0)
+            {
+                <div class="empty-state">Complete a sale to see product rankings.</div>
+            }
+            else
+            {
+                <div class="rank-list">
+                @for (var i = 0; i < snapshot.TopProducts.Count; i++)
+                {
+                    var product = snapshot.TopProducts[i];
+                    <div class="rank-row"><span class="rank">@(i + 1)</span><span class="product-thumb">@Initials(product.Name)</span><div><strong>@product.Name</strong><small>@product.Quantity sold</small></div><b>$@product.Revenue.ToString("N0")</b></div>
+                }
+                </div>
+            }
+        </article>
+        <article class="panel quick-panel">
+            <div class="panel-title"><div><h2>Quick actions</h2><p>Common store tasks</p></div></div>
+            <div class="quick-grid"><a href="products/new"><span>＋</span><strong>Add product</strong><small>Create variants</small></a><a href="inventory/receive"><span>⇣</span><strong>Receive stock</strong><small>Log delivery</small></a><a href="pos"><span>▣</span><strong>Open POS</strong><small>Start a sale</small></a><a href="customers"><span>♙</span><strong>Add customer</strong><small>Build loyalty</small></a></div>
+        </article>
+    </section>
+}
+
+@code {
+    private DashboardSnapshot? snapshot;
+    private int HealthPercent => snapshot is null || snapshot.VariantCount == 0 ? 100 : Math.Clamp((int)Math.Round(100m - snapshot.LowStockCount * 100m / snapshot.VariantCount), 0, 100);
+    protected override async Task OnInitializedAsync() => snapshot = await DashboardService.GetSnapshotAsync();
+    private static string Initials(string name) => string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(x => x[0])).ToUpperInvariant();
+}
