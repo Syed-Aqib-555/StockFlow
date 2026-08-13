@@ -1,0 +1,74 @@
+@page "/products"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+
+<PageTitle>Products · StockFlow</PageTitle>
+
+<div class="page-heading">
+    <div><p class="eyebrow">CATALOG</p><h1>Products</h1><p>Manage product details, variants, pricing, and availability.</p></div>
+    <div class="page-actions"><AuthorizeView Roles="Admin"><a class="btn btn-outline" href="products/catalog">Categories & suppliers</a><a class="btn btn-accent" href="products/new">＋ Add product</a></AuthorizeView></div>
+</div>
+
+<section class="data-panel">
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <div class="search-box"><input class="form-control" @bind="search" @bind:event="oninput" placeholder="Search name, SKU, or color…" /></div>
+            <select class="form-select" @bind="categoryId"><option value="0">All categories</option>@foreach (var category in categories){<option value="@category.Id">@category.Name</option>}</select>
+            <select class="form-select" @bind="stockFilter"><option value="all">All stock levels</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
+        </div>
+        <span class="muted">@FilteredProducts.Count() products</span>
+    </div>
+    @if (products is null)
+    {
+        <div class="empty-state">Loading product catalog…</div>
+    }
+    else if (!FilteredProducts.Any())
+    {
+        <div class="empty-state">No products match these filters.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="sf-table">
+                <thead><tr><th>Product</th><th>Category</th><th>Variants</th><th>Stock</th><th>Price range</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var product in FilteredProducts)
+                {
+                    var totalStock = product.Variants.Sum(x => x.QuantityOnHand);
+                    <tr>
+                        <td><div class="cell-product"><img src="@(product.ImageUrl ?? "favicon.png")" alt="" /><div><strong>@product.Name</strong><small>@product.Variants.FirstOrDefault()?.Sku</small></div></div></td>
+                        <td>@product.Category.Name</td>
+                        <td>@product.Variants.Count</td>
+                        <td><strong class="@(totalStock == 0 ? "text-danger" : "")">@totalStock</strong> units</td>
+                        <td class="money">$@product.Variants.Min(x => x.SellingPrice).ToString("N0") – $@product.Variants.Max(x => x.SellingPrice).ToString("N0")</td>
+                        <td><span class="status @(totalStock == 0 ? "danger" : product.Variants.Any(x => x.QuantityOnHand <= x.LowStockThreshold) ? "warning" : "success")">@(totalStock == 0 ? "Out of stock" : product.Variants.Any(x => x.QuantityOnHand <= x.LowStockThreshold) ? "Low stock" : "In stock")</span></td>
+                        <td><AuthorizeView Roles="Admin"><a class="btn btn-outline btn-sm" href="products/@product.Id/edit">Edit</a></AuthorizeView></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="pagination-row"><span>Showing @FilteredProducts.Count() of @products.Count products</span><span>Inventory updates in real time</span></div>
+    }
+</section>
+
+@code {
+    private List<Product>? products;
+    private List<Category> categories = [];
+    private string search = string.Empty;
+    private int categoryId;
+    private string stockFilter = "all";
+
+    private IEnumerable<Product> FilteredProducts => (products ?? [])
+        .Where(x => categoryId == 0 || x.CategoryId == categoryId)
+        .Where(x => string.IsNullOrWhiteSpace(search) || x.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || x.Variants.Any(v => v.Sku.Contains(search, StringComparison.OrdinalIgnoreCase) || v.Color.Contains(search, StringComparison.OrdinalIgnoreCase)))
+        .Where(x => stockFilter switch { "low" => x.Variants.Any(v => v.QuantityOnHand > 0 && v.QuantityOnHand <= v.LowStockThreshold), "out" => x.Variants.Sum(v => v.QuantityOnHand) == 0, _ => true });
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        categories = await db.Categories.AsNoTracking().OrderBy(x => x.Name).ToListAsync();
+        products = await db.Products.AsNoTracking().Include(x => x.Category).Include(x => x.Variants).Where(x => x.IsActive).OrderByDescending(x => x.CreatedAt).ToListAsync();
+    }
+}
