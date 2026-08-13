@@ -1,0 +1,19 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@using Microsoft.AspNetCore.Identity
+@using System.ComponentModel.DataAnnotations
+@inject UserManager<ApplicationUser> UserManager
+
+<PageTitle>Team & roles · StockFlow</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">ACCESS CONTROL</p><h1>Team & roles</h1><p>Create secure Admin and Cashier accounts with the right permissions.</p></div><button class="btn btn-accent" @onclick="()=>showForm=!showForm">＋ Add team member</button></div>
+@if(!string.IsNullOrWhiteSpace(message)){<div class="alert alert-success">@message</div>}@if(!string.IsNullOrWhiteSpace(error)){<div class="alert alert-danger">@error</div>}
+@if(showForm){<EditForm Model="form" OnValidSubmit="AddAsync"><DataAnnotationsValidator/><section class="form-card"><h2>New team member</h2><p>The temporary password can be changed from Account after the first sign-in.</p><div class="form-grid"><div><label class="form-label">Email</label><InputText class="form-control" @bind-Value="form.Email"/><ValidationMessage For="@(()=>form.Email)"/></div><div><label class="form-label">Role</label><InputSelect class="form-select" @bind-Value="form.Role"><option>Cashier</option><option>Admin</option></InputSelect></div><div class="full"><label class="form-label">Temporary password</label><InputText class="form-control" type="password" @bind-Value="form.Password"/><ValidationMessage For="@(()=>form.Password)"/></div></div><div class="page-actions mt-3"><button class="btn btn-accent" type="submit">Create account</button><button class="btn btn-outline" type="button" @onclick="()=>showForm=false">Cancel</button></div></section></EditForm>}
+<section class="profile-list">@foreach(var user in users){<article class="profile-card"><div class="profile-card-head"><span class="profile-avatar">@user.Email[0].ToString().ToUpperInvariant()</span><div><strong>@user.Email</strong><small>@user.Role</small></div></div><div class="mt-3"><span class="status success">Active</span><small class="d-block mt-2">@(user.EmailConfirmed?"Email confirmed":"Email confirmation pending")</small></div></article>}</section>
+
+@code{
+    private List<UserRow> users=[];private bool showForm;private UserForm form=new();private string? message,error;
+    protected override async Task OnInitializedAsync()=>await LoadAsync();private async Task LoadAsync(){users=[];foreach(var user in UserManager.Users.OrderBy(x=>x.Email)){var roles=await UserManager.GetRolesAsync(user);users.Add(new UserRow(user.Email??user.UserName??"Unknown",roles.FirstOrDefault()??"Unassigned",user.EmailConfirmed));}}
+    private async Task AddAsync(){message=error=null;var user=new ApplicationUser{UserName=form.Email.Trim(),Email=form.Email.Trim(),EmailConfirmed=true};var result=await UserManager.CreateAsync(user,form.Password);if(!result.Succeeded){error=string.Join("; ",result.Errors.Select(x=>x.Description));return;}await UserManager.AddToRoleAsync(user,form.Role);message=$"{form.Email} was created as {form.Role}.";form=new();showForm=false;await LoadAsync();}
+    private sealed record UserRow(string Email,string Role,bool EmailConfirmed);private sealed class UserForm{[Required,EmailAddress]public string Email{get;set;}="";[Required,MinLength(8)]public string Password{get;set;}="";public string Role{get;set;}="Cashier";}
+}
